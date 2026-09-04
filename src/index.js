@@ -215,10 +215,129 @@ module.exports = {
     }
     const store = new CharacterStore(layout)
 
+    const readBody = (req) => new Promise((fulfil) => {
+      const chunks = []
+      req.on('data', (c) => chunks.push(c))
+      req.on('end', () => fulfil(Buffer.concat(chunks).toString('utf8')))
+      req.on('error', () => fulfil(''))
+    })
+
     const sendJson = (res, status, payload) => {
       res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify(payload))
     }
+
+    // ── 修行事件流：订阅所有会话事件，供宠物联动 ──────────────────────────
+    //   kind: user_msg / assistant_msg / tool_call / tool_ok / tool_error /
+    //         turn_start / turn_end / turn_abort
+    const feed = []
+    let feedSeq = 0
+    const FEED_MAX = 200
+
+    const contentToText = (content) => {
+      if (typeof content === 'string') return content
+      if (!Array.isArray(content)) {
+        if (content && typeof content === 'object' && typeof content.text === 'string') return content.text
+        return ''
+      }
+      const parts = []
+      for (const block of content) {
+        if (!block || typeof block !== 'object') continue
+        if (block.type === 'text' && typeof block.text === 'string') parts.push(block.text)
+      }
+      return parts.join(' ')
+    }
+
+    const feedPush = (kind, extra = {}) => {
+      feedSeq += 1
+      feed.push({ id: feedSeq, at: new Date().toISOString(), kind, ...extra })
+      if (feed.length > FEED_MAX) feed.splice(0, feed.length - FEED_MAX)
+    }
+
+    const streamBuf = new Map()   // sessionId -> {text, lastEmit}
+    const STREAM_EMIT_MS = 1300
+
+    ctx.effect(() => {
+      const onSessionEvent = (session, event) => {
+        try {
+          const sessionId = session && session.id
+          if (typeof sessionId !== 'string') return
+          const sub = !!(session.header && session.header.origin === 'subagent')
+          const base = { sessionId, sub }
+          switch (event && event.type) {
+            case 'turn/start':
+              feedPush('turn_start', base)
+              break
+            case 'turn/end': {
+              const raw = event.data && event.data.reason
+              const reason = (raw && typeof raw === 'object' && typeof raw.kind === 'string') ? raw.kind : (raw || 'completed')
+              feedPush(reason === 'completed' ? 'turn_end' : 'turn_abort', { ...base, reason })
+              break
+            }
+            case 'user/message': {
+              const src = event.data && event.data.source
+              if (src && src.kind !== 'user') return // 插件注入不算道友发言
+              const text = contentToText(event.data && event.data.content).replace(/\s+/g, ' ').slice(0, 90)
+              feedPush('user_msg', { ...base, text })
+              break
+            }
+            case 'assistant/chunk': {
+              // 大模型流式返回：按会话累积，节流推送"心声道"（打字机效果）
+              const d = event.data || {}
+              const ch = d.chunk || {}
+              // 只收正文流（text-delta）；reasoning-delta 是思考流，不入播报
+              const piece = ch.type === 'text-delta' && typeof ch.text === 'string' ? ch.text : ''
+              if (!piece) return
+              const buf = streamBuf.get(sessionId) || { text: '', lastEmit: 0 }
+              buf.text += piece
+              streamBuf.set(sessionId, buf)
+              const now = Date.now()
+              if (now - buf.lastEmit >= STREAM_EMIT_MS && buf.text.trim()) {
+                buf.lastEmit = now
+                feedPush('assistant_msg', { ...base, text: buf.text.replace(/\s+/g, ' ').trim().slice(-140), streaming: true })
+              }
+              break
+            }
+            case 'step/end': {
+              const buf = streamBuf.get(sessionId)
+              if (buf && buf.text.trim()) {
+                feedPush('assistant_msg', { ...base, text: buf.text.replace(/\s+/g, ' ').trim().slice(-140), streaming: false })
+                streamBuf.delete(sessionId)
+              }
+              break
+            }
+            case 'turn/end': {
+              const buf = streamBuf.get(sessionId)
+              if (buf && buf.text.trim()) {
+                feedPush('assistant_msg', { ...base, text: buf.text.replace(/\s+/g, ' ').trim().slice(-140), streaming: false })
+                streamBuf.delete(sessionId)
+              }
+              break
+            }
+            case 'tool/call': {
+              const tool = (event.data && event.data.name) || 'tool'
+              let arg = ''
+              try {
+                const args = JSON.parse((event.data && event.data.arguments) || '{}')
+                arg = String(args.command || args.file_path || args.path || args.query || args.pattern || '').replace(/\s+/g, ' ').slice(0, 80)
+              } catch {}
+              feedPush('tool_call', { ...base, tool, arg })
+              break
+            }
+            case 'tool/result': {
+              const tool = (event.data && event.data.name) || ''
+              const failed = !!(event.data && ((event.data.message && event.data.message.isError === true) || event.data.error !== undefined))
+              feedPush(failed ? 'tool_error' : 'tool_ok', { ...base, tool })
+              break
+            }
+          }
+        } catch (e) {
+          ctx.logger?.warn?.(`[dsh-xiuxian] session/event handler: ${e && e.message}`)
+        }
+      }
+      const dispose = ctx.on('session/event', onSessionEvent)
+      return () => { try { dispose() } catch {} }
+    }, 'dsh-xiuxian: session/event subscription')
 
     ctx.effect(() => ctx.webServer.register({
       kind: 'prefix',
@@ -283,6 +402,22 @@ module.exports = {
           }
           if (req.method === 'GET' && p.endsWith('/dsh-xiuxian/api/lexicon')) {
             sendJson(res, 200, { tools: TOOLS, events: EVENTS, vocab: VOCAB })
+            return
+          }
+          if (req.method === 'GET' && p.endsWith('/dsh-xiuxian/api/feed')) {
+            const after = Number(url.searchParams.get('after') || 0)
+            const events = feed.filter((e) => e.id > after)
+            sendJson(res, 200, { events, last: feedSeq })
+            return
+          }
+          if (req.method === 'POST' && p.endsWith('/dsh-xiuxian/api/event')) {
+            const body = JSON.parse((await readBody(req)) || '{}')
+            feedSeq += 1
+            feed.push({ id: feedSeq, at: new Date().toISOString(),
+                        kind: body.kind || 'tool_call', tool: body.tool, arg: body.arg,
+                        text: body.text, sessionId: 'inject', sub: false })
+            if (feed.length > FEED_MAX) feed.splice(0, feed.length - FEED_MAX)
+            sendJson(res, 200, { id: feedSeq })
             return
           }
           if (req.method === 'GET' && p.endsWith('/dsh-xiuxian/api/status')) {

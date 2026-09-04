@@ -17,6 +17,8 @@ const STYLE = `
 @keyframes xx-hop{0%{transform:translateY(0) scale(1)}28%{transform:translateY(-16px) rotate(-7deg)}55%{transform:translateY(0) scaleY(.9)}75%{transform:translateY(-4px)}100%{transform:translateY(0) scale(1)}}
 @keyframes xx-pop{0%{transform:scale(.5) translateY(8px);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1) translateY(0);opacity:1}}
 @keyframes xx-zzz{0%{transform:translateY(0);opacity:0}30%{opacity:.9}100%{transform:translateY(-14px) translateX(6px);opacity:0}}
+@keyframes xx-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px) rotate(-5deg)}40%{transform:translateX(4px) rotate(5deg)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes xx-cast{0%{filter:none}40%{filter:drop-shadow(0 0 14px #ffd97a) brightness(1.25)}100%{filter:none}}
 @keyframes xx-svgaura{0%,100%{opacity:.5}50%{opacity:.85}}
 @keyframes xx-aura{0%,100%{opacity:.45;transform:translate(-50%,-50%) scale(1)}50%{opacity:.8;transform:translate(-50%,-50%) scale(1.08)}}
 .xx-eyes{transform-box:fill-box;transform-origin:center;animation:xx-blink 4.4s ease-in-out infinite}
@@ -72,6 +74,26 @@ function ensureStyle() {
   }
 }
 
+const TOOL_SPELL = [
+  [/bash|shell|terminal/i, '御剑术', '剑光一闪，敕令已行——'],
+  [/read|view/i, '天眼术', '灵光流转，玉简字字入识——'],
+  [/write/i, '开炉铸器', '祭出丹炉，采八方灵材——'],
+  [/edit|patch|multiedit/i, '重炼法器', '真火重熔器身，修补纹路——'],
+  [/grep|search/i, '搜魂大法', '神识如潮，遍扫灵机脉络——'],
+  [/glob|ls|find/i, '周天星斗大衍术', '星盘转动，推演万物方位——'],
+  [/websearch|web_search/i, '神游太虚', '元神出窍，神游太虚之外——'],
+  [/webfetch|fetch|reader/i, '摘星换月', '大袖一挥，摄天外灵物于掌中——'],
+  [/task|agent/i, '身外化身', '掐诀分魂，遣化身携法宝而行——'],
+  [/todo/i, '道纲排定', '刻道碑以定行止——'],
+  [/skill/i, '施展神通', '法诀掐动，神通轰然而出——'],
+  [/diagnostic|lsp/i, '诊脉术', '金针度穴，探查经脉暗伤——'],
+  [/git/i, '刻碑术', '以岁月为凿，刻此一行进道碑——'],
+]
+const spellOf = (tool) => {
+  for (const [re, name, cast] of TOOL_SPELL) if (re.test(tool || '')) return { name, cast }
+  return { name: '施展法术', cast: '法诀掐动，灵光乍现——' }
+}
+
 const api = (p) => fetch(`/dsh-xiuxian/api${p}`).then((r) => {
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
   return r.json()
@@ -97,6 +119,10 @@ module.exports = {
       const breakTimer = React.useRef(undefined)
       const hideTimer = React.useRef(undefined)
       const stageRef = React.useRef(undefined)
+      const [linked, setLinked] = React.useState(true)   // 事件联动开关
+      const lastId = React.useRef(0)
+      const lastBubbleAt = React.useRef(0)
+      const [fx, setFx] = React.useState('')             // 施法/受惊动画类
 
       const say = (m, keepOpen) => {
         setMsg(m)
@@ -168,6 +194,66 @@ module.exports = {
         say({ tag: '入定', text: `${cha ? cha.name : '灵宠'}盘坐运功……每 25 分钟提醒道友起身。` })
       }
 
+      // ── 事件联动：不同消息类型 → 不同说话与动作 ──
+      const flash = (cls) => {
+        setFx(cls)
+        setTimeout(() => setFx(''), 700)
+      }
+      const react = (ev) => {
+        if (!linked || !cha) return
+        const now = Date.now()
+        const who = cha.name
+        const subTag = ev.sub ? '（化身）' : ''
+        switch (ev.kind) {
+          case 'user_msg':
+            flash('xx-hop')
+            say({ tag: '道友发问', text: ev.text ? `“${ev.text}”\n\n${who}凝神细听……` : `${who}竖起了耳朵……` })
+            break
+          case 'tool_call': {
+            if (now - lastBubbleAt.current < 900) { flash('xx-hop'); return }
+            lastBubbleAt.current = now
+            const sp = spellOf(ev.tool)
+            flash('xx-cast')
+            say({ tag: `${sp.name}${subTag}`, text: `${sp.cast}\n【${ev.tool}】${ev.arg || ''}` }, true)
+            break
+          }
+          case 'tool_error':
+            flash('xx-shake')
+            say({ tag: '天劫雷音', text: `【${ev.tool || '法器'}】轰然炸响！道友莫慌，且看${who}如何补天。` })
+            break
+          case 'tool_ok':
+            flash('xx-hop') // 不冒泡，避免刷屏
+            break
+          case 'assistant_msg':
+            if (now - lastBubbleAt.current < 1200) return
+            lastBubbleAt.current = now
+            say({ tag: `${who} · 心声道${subTag}`, text: `“${ev.text}”` }, true)
+            break
+          case 'turn_end':
+            flash('xx-hop')
+            say({ tag: '功行圆满', text: `此局事了，道果+1。${who}满意地眯起了眼。` })
+            break
+          case 'turn_abort':
+            say({ tag: '收势', text: '道友收了神通？也罢，张弛有道。' })
+            break
+        }
+      }
+
+      // 轮询事件流
+      React.useEffect(() => {
+        const tick = () => {
+          if (document.visibilityState !== 'visible') return
+          api(`/feed?after=${lastId.current}`).then((r) => {
+            for (const ev of r.events || []) {
+              lastId.current = Math.max(lastId.current, ev.id)
+              react(ev)
+            }
+          }).catch(() => {})
+        }
+        const iv = setInterval(tick, 1600)
+        return () => clearInterval(iv)
+      })
+
       const petClick = () => {
         setHop(true)
         setTimeout(() => setHop(false), 660)
@@ -195,6 +281,7 @@ module.exports = {
       if (cha && av) { try { window.__xxKind = av.traits.kind } catch {} }
 
       const tools = [
+        [linked ? '🎬' : '🎬', linked ? '联动开' : '联动关', () => setLinked((v) => !v), linked],
         ['🔄', '换一位', reroll, false],
         ['💬', '指点一二', speak, false],
         ['📜', '复制技能', copySkill, false],
@@ -219,7 +306,7 @@ module.exports = {
           style: pos ? { right: 'auto', bottom: 'auto', left: pos.x, top: pos.y } : undefined,
         },
           React.createElement('div', {
-            className: 'xx-pet' + (hop ? ' xx-hop' : '') + (meditate ? ' xx-meditate' : ''),
+            className: 'xx-pet' + (hop ? ' xx-hop' : '') + (meditate ? ' xx-meditate' : '') + (fx ? ` ${fx}` : ''),
             onMouseDown: onDown,
             onClick: () => { if (!drag || !drag.moved) petClick() },
             title: cha ? `${cha.name}（点我说话，拖我挪窝）` : '唤醒中…',
