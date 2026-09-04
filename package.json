@@ -35,7 +35,8 @@
   "scripts": {
     "check": "node --check src/index.js && node --check client/index.js",
     "build:client": "node scripts/build-client.mjs",
-    "prepublishOnly": "npm run build:client && npm run check"
+    "prepublishOnly": "npm run build:client && npm run check",
+    "test": "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=22.5"
