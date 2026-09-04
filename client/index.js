@@ -49,20 +49,22 @@ const STYLE = `
 .xx-tier{position:absolute;left:0px;top:14px;font-size:13px;filter:drop-shadow(0 0 4px #ffd97a)}
 .xx-name{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);white-space:nowrap;
   color:#d4b06a;font-size:11px;text-shadow:0 1px 2px rgba(0,0,0,.6)}
-.xx-bubble{position:fixed;right:18px;bottom:168px;width:340px;background:#fffdf6;color:#3a332a;
-  border:2px solid #d4b06a;border-radius:16px;padding:12px 14px 10px;z-index:1199;
-  box-shadow:0 10px 30px rgba(0,0,0,.35);animation:xx-pop .28s ease}
-.xx-bubble::after{content:"";position:absolute;right:44px;bottom:-9px;width:14px;height:14px;background:#fffdf6;
+.xx-bubble{position:fixed;right:20px;bottom:150px;width:252px;background:#fffdf6;color:#3a332a;
+  border:1.5px solid #d4b06a;border-radius:12px;padding:8px 10px 7px;z-index:1199;
+  box-shadow:0 8px 22px rgba(0,0,0,.32);animation:xx-pop .28s ease;font-size:11.5px;line-height:1.55}
+.xx-bubble::after{content:"";position:absolute;right:34px;bottom:-9px;width:14px;height:14px;background:#fffdf6;
   border-right:2px solid #d4b06a;border-bottom:2px solid #d4b06a;transform:rotate(45deg)}
-.xx-btag{display:inline-block;background:#5a4a1e;color:#ffd97a;border-radius:8px;padding:1px 9px;
-  font-size:11px;margin-bottom:6px}
-.xx-btext{max-height:200px;overflow-y:auto;white-space:pre-wrap;font-size:13px;user-select:text}
-.xx-bnote{color:#a08c5a;font-size:11px;margin-top:6px}
-.xx-tools{display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px dashed #e3d5ae}
-.xx-tbtn{flex:1;background:#f4ead0;border:1px solid #e0cd96;border-radius:10px;color:#6b5a26;
-  font-size:15px;line-height:1;padding:6px 0;cursor:pointer;text-align:center}
+.xx-btag{display:inline-block;background:#5a4a1e;color:#ffd97a;border-radius:7px;padding:0 7px;
+  font-size:10px;margin-bottom:4px}
+.xx-btext{max-height:128px;overflow-y:auto;white-space:pre-wrap;font-size:11.5px;user-select:text}
+.xx-bnote{color:#a08c5a;font-size:10px;margin-top:4px}
+.xx-tools{display:flex;gap:4px;margin-top:6px;padding-top:5px;border-top:1px dashed #e3d5ae}
+.xx-tbtn{flex:1;background:#f4ead0;border:1px solid #e0cd96;border-radius:8px;color:#6b5a26;
+  font-size:13px;line-height:1;padding:4px 0;cursor:pointer;text-align:center}
 .xx-tbtn:hover{background:#ffe9a8;transform:translateY(-1px)}
 .xx-tbtn.on{background:#d4b06a;color:#fff}
+.xx-al{display:flex;align-items:center;gap:6px;margin-top:5px;color:#a08c5a;font-size:10px}
+.xx-al input[type=range]{flex:1;height:3px;accent-color:#d4b06a;cursor:pointer}
 `
 
 function ensureStyle() {
@@ -123,6 +125,10 @@ module.exports = {
       const lastId = React.useRef(0)
       const lastBubbleAt = React.useRef(0)
       const [fx, setFx] = React.useState('')             // 施法/受惊动画类
+      const [alpha, setAlpha] = React.useState(() => {
+        const v = parseFloat(localStorage.getItem('xx-alpha'))
+        return Number.isFinite(v) ? Math.min(1, Math.max(0.35, v)) : 0.92
+      })
 
       const say = (m, keepOpen) => {
         setMsg(m)
@@ -292,18 +298,28 @@ module.exports = {
 
       return React.createElement(React.Fragment, null,
 
-        open && React.createElement('div', { className: 'xx-bubble' },
+        open && React.createElement('div', { className: 'xx-bubble', style: { opacity: alpha } },
           React.createElement('span', { className: 'xx-btag' }, msg.tag),
           React.createElement('div', { className: 'xx-btext' }, msg.text),
           msg.note && React.createElement('div', { className: 'xx-bnote' }, msg.note),
           React.createElement('div', { className: 'xx-tools' },
             tools.map(([icon, title, fn, on]) => React.createElement('button', {
               key: title, className: 'xx-tbtn' + (on ? ' on' : ''), title, onClick: fn,
-            }, icon)))),
+            }, icon))),
+          React.createElement('div', { className: 'xx-al' },
+            '透明度',
+            React.createElement('input', {
+              type: 'range', min: 35, max: 100, value: Math.round(alpha * 100),
+              onInput: (e) => {
+                const v = Number(e.target.value) / 100
+                setAlpha(v)
+                try { localStorage.setItem('xx-alpha', String(v)) } catch {}
+              },
+            }))),
 
         React.createElement('div', {
           ref: stageRef, className: 'xx-stage',
-          style: pos ? { right: 'auto', bottom: 'auto', left: pos.x, top: pos.y } : undefined,
+          style: Object.assign({ opacity: alpha }, pos ? { right: 'auto', bottom: 'auto', left: pos.x, top: pos.y } : {}),
         },
           React.createElement('div', {
             className: 'xx-pet' + (hop ? ' xx-hop' : '') + (meditate ? ' xx-meditate' : '') + (fx ? ` ${fx}` : ''),
