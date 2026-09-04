@@ -1,6 +1,6 @@
 {
   "name": "@weibaohui/dsh-xiuxian",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "dsh 插件 · 修仙陪伴：随机唤醒《凡人修仙传》角色，Q版电子宠物与你的 agent 会话实时联动——工具调用=施法、大模型返回=心声道、报错=天劫雷音、回合完成=功行圆满。",
   "license": "MIT",
   "keywords": [

@@ -17,11 +17,18 @@ const STYLE = `
 @keyframes xx-hop{0%{transform:translateY(0) scale(1)}28%{transform:translateY(-16px) rotate(-7deg)}55%{transform:translateY(0) scaleY(.9)}75%{transform:translateY(-4px)}100%{transform:translateY(0) scale(1)}}
 @keyframes xx-pop{0%{transform:scale(.5) translateY(8px);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1) translateY(0);opacity:1}}
 @keyframes xx-zzz{0%{transform:translateY(0);opacity:0}30%{opacity:.9}100%{transform:translateY(-14px) translateX(6px);opacity:0}}
+@keyframes xx-breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(.99,1.03)}}
+@keyframes xx-wag{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(9deg)}}
+@keyframes xx-twinkle{0%,100%{opacity:.25;transform:scale(.7) rotate(0deg)}50%{opacity:1;transform:scale(1.2) rotate(22deg)}}
 @keyframes xx-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px) rotate(-5deg)}40%{transform:translateX(4px) rotate(5deg)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
 @keyframes xx-cast{0%{filter:none}40%{filter:drop-shadow(0 0 14px #ffd97a) brightness(1.25)}100%{filter:none}}
 @keyframes xx-svgaura{0%,100%{opacity:.5}50%{opacity:.85}}
 @keyframes xx-aura{0%,100%{opacity:.45;transform:translate(-50%,-50%) scale(1)}50%{opacity:.8;transform:translate(-50%,-50%) scale(1.08)}}
 .xx-eyes{transform-box:fill-box;transform-origin:center;animation:xx-blink 4.4s ease-in-out infinite}
+.xx-bodyG{transform-box:fill-box;transform-origin:50% 92%;animation:xx-breathe 2.6s ease-in-out infinite}
+.xx-tail{transform-box:fill-box;transform-origin:15% 85%;animation:xx-wag 2.1s ease-in-out infinite}
+.xx-spark{transform-box:fill-box;transform-origin:center;animation:xx-twinkle 1.8s ease-in-out infinite}
+.xx-spark.s2{animation-delay:.9s}
 .xx-svgAura{animation:xx-svgaura 3.2s ease-in-out infinite}
 .xx-av{position:absolute;left:50%;top:44px;transform:translateX(-50%);width:104px;height:104px}
 .xx-stage{position:fixed;right:30px;bottom:22px;z-index:1200;font:13px/1.6 "PingFang SC","Microsoft YaHei",sans-serif;user-select:none}
