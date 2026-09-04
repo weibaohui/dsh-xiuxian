@@ -1,5 +1,9 @@
 # @weibaohui/dsh-xiuxian
 
+[![CI](https://github.com/weibaohui/dsh-xiuxian/actions/workflows/ci.yml/badge.svg)](https://github.com/weibaohui/dsh-xiuxian/actions/workflows/ci.yml)
+
+![修仙陪伴宠物](docs/demo.gif)
+
 dsh 插件 · 修仙陪伴。随机唤醒一位《凡人修仙传》角色，以悬浮浮层陪伴你写代码。
 
 **数据集随包自带，开箱即用**：2496 张去重人物卡片（经历年表/口吻/语录/关系）+ 2055 份角色对话技能（Tier1 含开场白与专属守则）+ 2060 份生平 + 关系图数据。源自全书 2451 章逐章精读分析，经 183 对候选卡片逐一原文考证去重合并。
