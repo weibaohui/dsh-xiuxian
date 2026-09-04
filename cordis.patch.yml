@@ -1,0 +1,10 @@
+# dsh-xiuxian bundle patch: contributes the plugin row into the
+# host composition when this package is installed via `dsh plugin add`.
+#
+# HOST-PLANE: reads the 凡人修仙传 character dataset from local disk and
+# serves its HTTP API over a webServer route; the client half registers a
+# sidebar footer action rendering the floating companion overlay.
+
+- insert:
+    - id: dsh-xiuxian
+      name: '@weibaohui/dsh-xiuxian'

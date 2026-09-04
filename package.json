@@ -1,0 +1,60 @@
+{
+  "name": "@weibaohui/dsh-xiuxian",
+  "version": "0.3.0",
+  "description": "dsh 插件 · 修仙陪伴：随机唤醒一位《凡人修仙传》角色，以特征驱动的 Q 版电子宠物形态悬浮陪伴你写代码（2496 角色各具专属形象：虫/兽/傀儡/鬼魂/僧人/女修/老者/孩童九类形态 × 十四种配色 × 十三类法宝）。",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "xiuxian",
+    "companion",
+    "dsh-plugin"
+  ],
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./client/bundle.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "files": [
+    "src",
+    "client",
+    "data",
+    "cordis.patch.yml"
+  ],
+  "scripts": {
+    "check": "node --check src/index.js && node --check client/index.js",
+    "build:client": "node scripts/build-client.mjs",
+    "prepublishOnly": "npm run build:client && npm run check"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weibaohui/dsh-xiuxian.git"
+  },
+  "homepage": "https://github.com/weibaohui/dsh-xiuxian#readme",
+  "bugs": {
+    "url": "https://github.com/weibaohui/dsh-xiuxian/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
