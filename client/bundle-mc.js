@@ -421,7 +421,7 @@ window.__ModuleLoader__.load({
     .xx-btext{max-height:150px;overflow-y:auto;white-space:pre-wrap}
     .xx-bnote{color:#8a7c52;font-size:10px;margin-top:4px}
     /* 右键菜单 */
-    .xx-menu{position:fixed;z-index:1250;width:196px;background:#161c26;border:1px solid #3a4656;border-radius:10px;
+    .xx-menu{position:fixed;z-index:1250;width:196px;max-height:calc(100vh - 24px);overflow-y:auto;background:#161c26;border:1px solid #3a4656;border-radius:10px;
       box-shadow:0 10px 32px rgba(0,0,0,.55);padding:5px;font:12.5px/1.5 "PingFang SC",sans-serif;color:#d8dee6;animation:xx-pop .16s ease}
     .xx-mi{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
     .xx-mi:hover{background:#26303e;color:#d4b06a}
@@ -777,10 +777,21 @@ window.__ModuleLoader__.load({
           const openMenu = (e) => {
             e.preventDefault()
             e.stopPropagation()
-            setMenu({ x: Math.min(e.clientX, window.innerWidth - 210), y: Math.min(e.clientY, window.innerHeight - 320) })
+            setMenu({ x: Math.min(e.clientX, window.innerWidth - 210), y: e.clientY })
           }
           React.useEffect(() => {
             if (!menu) return
+            // 渲染后测量实际高度：底部越界则整体上移（滑杆永远完整可见）。
+            // 用双 rAF 确保布局完成；上移后 menu.y 变化会重触发本 effect 复测（收敛后不再移动）。
+            const measure = () => {
+              const el = document.querySelector('.xx-menu')
+              if (!el) return
+              const rect = el.getBoundingClientRect()
+              const overflow = rect.bottom - (window.innerHeight - 12)
+              if (overflow > 0) setMenu((m) => (m && m.y > 8 ? { ...m, y: Math.max(8, m.y - overflow) } : m))
+            }
+            requestAnimationFrame(() => requestAnimationFrame(measure))
+            setTimeout(measure, 60)
             const close = () => setMenu(undefined)
             // 延迟挂载：跳过打开菜单的那次右键事件，否则菜单刚开即被同事件关闭
             const t = setTimeout(() => {
