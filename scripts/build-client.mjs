@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const sourcePath = join(here, '..', 'client', 'index.js')
-const bundlePath = join(here, '..', 'client', 'bundle.js')
+const bundlePath = join(here, '..', 'client', 'bundle-mc.js')
 
 const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8'))
 const avatarSource = readFileSync(join(here, '..', 'client', 'avatar.js'), 'utf8')

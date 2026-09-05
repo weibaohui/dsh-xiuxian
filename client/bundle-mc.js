@@ -235,6 +235,41 @@ window.__ModuleLoader__.load({
       '..oooo.....ooooo.....',
     ]
 
+    /* ── 状态变体（以基础模板为底，程序化变换）──
+       idle: 默认（开眼）
+       working: 头前倾 + 手抬起（敲键盘感）——手臂行前移
+       failed: 倒地（整体旋转 90°）+ 流泪行
+       sleep: 闭眼 + 眼行变肤色线 */
+
+    function variantWorking(grid) {
+      // 把手臂行（含 s 肤色在身体两侧的行）的 s 左移一位，模拟举手敲击
+      return grid.map((row) => {
+        if (!row.includes('s') || row.indexOf('s') < 0) return row
+        const i = row.indexOf('s')
+        if (i === 0 || row[i - 1] === 's') return row
+        return row.slice(0, i - 1) + 's' + row.slice(i - 1, i) + row.slice(i + 1)
+      })
+    }
+
+    function variantFailed(grid) {
+      // 整体顺时针倒地（转置+翻转），行宽归一
+      const h = grid.length, w = grid[0].length
+      const rot = []
+      for (let x = 0; x < w; x++) {
+        let newRow = ''
+        for (let y = h - 1; y >= 0; y--) newRow += grid[y][x] === '.' ? '.' : grid[y][x]
+        rot.push(newRow.slice(0, w).padEnd(w, '.'))
+      }
+      while (rot.length > h) rot.pop()
+      while (rot.length < h) rot.push('.'.repeat(w))
+      return rot
+    }
+
+    function variantSleep(grid) {
+      // 全行闭眼：e→o(线) w→删除，并加 z 前缀行不行——直接闭眼即可
+      return grid.map((row) => row.replace(/e/g, 'o').replace(/w/g, '.'))
+    }
+
     const TEMPLATES = {
       humanoid: T_HUMANOID, girl: T_HUMANOID, elder: T_HUMANOID, child: T_HUMANOID, monk: T_HUMANOID, cultivator: T_HUMANOID,
       beast: T_BEAST, bird: T_BIRD, insect: T_INSECT, ghost: T_GHOST, puppet: T_PUPPET,
@@ -315,16 +350,33 @@ window.__ModuleLoader__.load({
       return grid.map((row) => row.replace(/[ep]/g, 's').replace(/[ew]w/g, 'ss'))
     }
 
-    function xxAvatarSVG(c) {
+    function xxAvatarSVG(c, state = 'idle') {
       const t = xxAnalyze(c)
       const palette = paletteOf(t)
-      const grid = (TEMPLATES[t.kind] || T_HUMANOID).map((r) => (r + '................').slice(0, 16))
-      const open = el('g', { class: 'xx-eo' }, gridToRects(grid, palette))
-      const closed = el('g', { class: 'xx-ec' }, gridToRects(closedGrid(grid), palette))
+      let grid = (TEMPLATES[t.kind] || T_HUMANOID).map((r) => (r + '................').slice(0, 16))
+      if (state === 'working') grid = variantWorking(grid)
+      else if (state === 'failed') grid = variantFailed(grid)
+      else if (state === 'sleep') grid = variantSleep(grid)
+      // 真·双帧待机：frameA 原画，frameB 整体下沉 1 格（FC 弹跳）
+      const gridB = ['................', ...grid.slice(0, grid.length - 1)]
+      const frameA = el('g', { class: 'xx-eo' }, gridToRects(grid, palette))
+      const frameB = el('g', { class: 'xx-ec' }, gridToRects(closedGrid(grid), palette))
+      const frameBounce = el('g', { class: 'xx-hopf' }, el('g', { transform: 'translate(0 1)' },
+        el('g', { class: 'xx-eo' }, gridToRects(gridB, palette))))
+      let tear = ''
+      if (state === 'failed') {
+        tear = el('g', { class: 'xx-tear' },
+          el('rect', { x: 4, y: 7, width: 1, height: 1, fill: '#7ab8ff' }) +
+          el('rect', { x: 11, y: 9, width: 1, height: 1, fill: '#7ab8ff' }))
+      }
+      const inner =
+        el('g', { class: 'xx-fA' }, frameA + frameB) +
+        el('g', { class: 'xx-fB' }, frameBounce) +
+        tear
       const svg = el('svg', {
         class: 'xx-svg', viewBox: `0 0 ${grid[0].length} ${grid.length}`, width: '100%', height: '100%',
         'shape-rendering': 'crispEdges', xmlns: 'http://www.w3.org/2000/svg',
-      }, open + closed)
+      }, inner)
       return { svg, traits: t }
     }
 
@@ -347,6 +399,7 @@ window.__ModuleLoader__.load({
     @keyframes xx-hop{0%{transform:translateY(0)}30%{transform:translateY(-10px) rotate(-4deg)}60%{transform:translateY(0)}80%{transform:translateY(-3px)}100%{transform:translateY(0)}}
     @keyframes xx-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px) rotate(-3deg)}50%{transform:translateX(3px) rotate(3deg)}75%{transform:translateX(-2px)}}
     @keyframes xx-pop{0%{transform:scale(.7) translateY(6px);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1) translateY(0);opacity:1}}
+    @keyframes xx-tearfall{0%{transform:translateY(0);opacity:1}100%{transform:translateY(5px);opacity:0}}
     @keyframes xx-zzz{0%{transform:translateY(0);opacity:0}30%{opacity:.9}100%{transform:translateY(-12px) translateX(5px);opacity:0}}
     .xx-stage{position:fixed;right:26px;bottom:18px;z-index:1200;display:flex;gap:4px;align-items:flex-end;
       font:13px/1.6 "PingFang SC","Microsoft YaHei",sans-serif;user-select:none}
@@ -379,10 +432,13 @@ window.__ModuleLoader__.load({
     .xx-trigger:hover{background:#222c39;color:#d4b06a}
     `
 
+    const STYLE_VER = 'v5'
     function ensureStyle() {
-      if (!document.getElementById('dsh-xiuxian-style')) {
+      const id = `dsh-xiuxian-style-${STYLE_VER}`
+      if (!document.getElementById(id)) {
+        document.querySelectorAll('style[id^="dsh-xiuxian-style"]').forEach((n) => n.remove())
         const tag = document.createElement('style')
-        tag.id = 'dsh-xiuxian-style'
+        tag.id = id
         tag.textContent = STYLE
         document.head.appendChild(tag)
       }
@@ -439,6 +495,7 @@ window.__ModuleLoader__.load({
             return Number.isFinite(v) ? Math.min(1, Math.max(0.35, v)) : 0.92
           })
           const [fx, setFx] = React.useState('')
+          const [mood, setMood] = React.useState('idle')   // idle | working | failed | sleep
           const [pos, setPos] = React.useState(undefined)
           const [drag, setDrag] = React.useState(undefined)
           const breakTimer = React.useRef(undefined)
@@ -512,14 +569,17 @@ window.__ModuleLoader__.load({
                 say({ tag: `${c.name} · 心声道`, text: `“${ev.text}”` }, 7000)
                 break
               case 'tool_error':
+                setMood('failed')
                 setFx('xx-shake')
                 say({ tag: '天劫雷音', text: `【${ev.tool || '法器'}】轰然炸响！\n${q ? `“${q}”` : `${c.name}：道友莫慌，且看如何补天。`}` }, 7000)
                 break
               case 'turn_end':
+                setMood('idle')
                 setFx('xx-hop')
                 say({ tag: '功行圆满', text: `【${c.name}】此局事了，道果+1。${q ? `“${q}”` : ''}` }, 6000)
                 break
               case 'turn_abort':
+                setMood('idle')
                 say({ tag: '收势', text: `【${c.name}】道友收了神通？张弛有道。` }, 5000)
                 break
             }
@@ -565,6 +625,7 @@ window.__ModuleLoader__.load({
             if (meditate) {
               if (breakTimer.current) clearTimeout(breakTimer.current)
               setMeditate(false)
+              setMood('idle')
               say({ tag: '出定', text: '众灵宠收功，继续修行！' })
               return
             }
@@ -577,6 +638,7 @@ window.__ModuleLoader__.load({
             }
             arm()
             setMeditate(true)
+            setMood('sleep')
             say({ tag: '入定', text: '众灵宠盘坐运功……每 25 分钟提醒道友起身。' })
           }
 
@@ -651,7 +713,7 @@ window.__ModuleLoader__.load({
                 onClick: () => petClick(i),
                 title: `${c.name}（点我说话）`,
               },
-                React.createElement('div', { className: 'xx-av', dangerouslySetInnerHTML: { __html: xxAvatarSVG(c).svg } }),
+                React.createElement('div', { className: 'xx-av', dangerouslySetInnerHTML: { __html: xxAvatarSVG(c, mood).svg } }),
                 React.createElement('div', { className: 'xx-name' }, c.name + (meditate ? ' · 定' : '')))),
               !party.length && React.createElement('div', { className: 'xx-petwrap', onClick: reroll },
                 React.createElement('div', { className: 'xx-av' }),

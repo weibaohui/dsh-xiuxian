@@ -225,6 +225,41 @@ const T_PUPPET = [
   '..oooo.....ooooo.....',
 ]
 
+/* ── 状态变体（以基础模板为底，程序化变换）──
+   idle: 默认（开眼）
+   working: 头前倾 + 手抬起（敲键盘感）——手臂行前移
+   failed: 倒地（整体旋转 90°）+ 流泪行
+   sleep: 闭眼 + 眼行变肤色线 */
+
+function variantWorking(grid) {
+  // 把手臂行（含 s 肤色在身体两侧的行）的 s 左移一位，模拟举手敲击
+  return grid.map((row) => {
+    if (!row.includes('s') || row.indexOf('s') < 0) return row
+    const i = row.indexOf('s')
+    if (i === 0 || row[i - 1] === 's') return row
+    return row.slice(0, i - 1) + 's' + row.slice(i - 1, i) + row.slice(i + 1)
+  })
+}
+
+function variantFailed(grid) {
+  // 整体顺时针倒地（转置+翻转），行宽归一
+  const h = grid.length, w = grid[0].length
+  const rot = []
+  for (let x = 0; x < w; x++) {
+    let newRow = ''
+    for (let y = h - 1; y >= 0; y--) newRow += grid[y][x] === '.' ? '.' : grid[y][x]
+    rot.push(newRow.slice(0, w).padEnd(w, '.'))
+  }
+  while (rot.length > h) rot.pop()
+  while (rot.length < h) rot.push('.'.repeat(w))
+  return rot
+}
+
+function variantSleep(grid) {
+  // 全行闭眼：e→o(线) w→删除，并加 z 前缀行不行——直接闭眼即可
+  return grid.map((row) => row.replace(/e/g, 'o').replace(/w/g, '.'))
+}
+
 const TEMPLATES = {
   humanoid: T_HUMANOID, girl: T_HUMANOID, elder: T_HUMANOID, child: T_HUMANOID, monk: T_HUMANOID, cultivator: T_HUMANOID,
   beast: T_BEAST, bird: T_BIRD, insect: T_INSECT, ghost: T_GHOST, puppet: T_PUPPET,
@@ -305,16 +340,33 @@ function closedGrid(grid) {
   return grid.map((row) => row.replace(/[ep]/g, 's').replace(/[ew]w/g, 'ss'))
 }
 
-function xxAvatarSVG(c) {
+function xxAvatarSVG(c, state = 'idle') {
   const t = xxAnalyze(c)
   const palette = paletteOf(t)
-  const grid = (TEMPLATES[t.kind] || T_HUMANOID).map((r) => (r + '................').slice(0, 16))
-  const open = el('g', { class: 'xx-eo' }, gridToRects(grid, palette))
-  const closed = el('g', { class: 'xx-ec' }, gridToRects(closedGrid(grid), palette))
+  let grid = (TEMPLATES[t.kind] || T_HUMANOID).map((r) => (r + '................').slice(0, 16))
+  if (state === 'working') grid = variantWorking(grid)
+  else if (state === 'failed') grid = variantFailed(grid)
+  else if (state === 'sleep') grid = variantSleep(grid)
+  // 真·双帧待机：frameA 原画，frameB 整体下沉 1 格（FC 弹跳）
+  const gridB = ['................', ...grid.slice(0, grid.length - 1)]
+  const frameA = el('g', { class: 'xx-eo' }, gridToRects(grid, palette))
+  const frameB = el('g', { class: 'xx-ec' }, gridToRects(closedGrid(grid), palette))
+  const frameBounce = el('g', { class: 'xx-hopf' }, el('g', { transform: 'translate(0 1)' },
+    el('g', { class: 'xx-eo' }, gridToRects(gridB, palette))))
+  let tear = ''
+  if (state === 'failed') {
+    tear = el('g', { class: 'xx-tear' },
+      el('rect', { x: 4, y: 7, width: 1, height: 1, fill: '#7ab8ff' }) +
+      el('rect', { x: 11, y: 9, width: 1, height: 1, fill: '#7ab8ff' }))
+  }
+  const inner =
+    el('g', { class: 'xx-fA' }, frameA + frameB) +
+    el('g', { class: 'xx-fB' }, frameBounce) +
+    tear
   const svg = el('svg', {
     class: 'xx-svg', viewBox: `0 0 ${grid[0].length} ${grid.length}`, width: '100%', height: '100%',
     'shape-rendering': 'crispEdges', xmlns: 'http://www.w3.org/2000/svg',
-  }, open + closed)
+  }, inner)
   return { svg, traits: t }
 }
 

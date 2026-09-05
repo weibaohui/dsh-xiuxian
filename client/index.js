@@ -15,6 +15,7 @@ const STYLE = `
 @keyframes xx-hop{0%{transform:translateY(0)}30%{transform:translateY(-10px) rotate(-4deg)}60%{transform:translateY(0)}80%{transform:translateY(-3px)}100%{transform:translateY(0)}}
 @keyframes xx-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px) rotate(-3deg)}50%{transform:translateX(3px) rotate(3deg)}75%{transform:translateX(-2px)}}
 @keyframes xx-pop{0%{transform:scale(.7) translateY(6px);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1) translateY(0);opacity:1}}
+@keyframes xx-tearfall{0%{transform:translateY(0);opacity:1}100%{transform:translateY(5px);opacity:0}}
 @keyframes xx-zzz{0%{transform:translateY(0);opacity:0}30%{opacity:.9}100%{transform:translateY(-12px) translateX(5px);opacity:0}}
 .xx-stage{position:fixed;right:26px;bottom:18px;z-index:1200;display:flex;gap:4px;align-items:flex-end;
   font:13px/1.6 "PingFang SC","Microsoft YaHei",sans-serif;user-select:none}
@@ -47,10 +48,13 @@ const STYLE = `
 .xx-trigger:hover{background:#222c39;color:#d4b06a}
 `
 
+const STYLE_VER = 'v5'
 function ensureStyle() {
-  if (!document.getElementById('dsh-xiuxian-style')) {
+  const id = `dsh-xiuxian-style-${STYLE_VER}`
+  if (!document.getElementById(id)) {
+    document.querySelectorAll('style[id^="dsh-xiuxian-style"]').forEach((n) => n.remove())
     const tag = document.createElement('style')
-    tag.id = 'dsh-xiuxian-style'
+    tag.id = id
     tag.textContent = STYLE
     document.head.appendChild(tag)
   }
@@ -107,6 +111,7 @@ module.exports = {
         return Number.isFinite(v) ? Math.min(1, Math.max(0.35, v)) : 0.92
       })
       const [fx, setFx] = React.useState('')
+      const [mood, setMood] = React.useState('idle')   // idle | working | failed | sleep
       const [pos, setPos] = React.useState(undefined)
       const [drag, setDrag] = React.useState(undefined)
       const breakTimer = React.useRef(undefined)
@@ -180,14 +185,17 @@ module.exports = {
             say({ tag: `${c.name} · 心声道`, text: `“${ev.text}”` }, 7000)
             break
           case 'tool_error':
+            setMood('failed')
             setFx('xx-shake')
             say({ tag: '天劫雷音', text: `【${ev.tool || '法器'}】轰然炸响！\n${q ? `“${q}”` : `${c.name}：道友莫慌，且看如何补天。`}` }, 7000)
             break
           case 'turn_end':
+            setMood('idle')
             setFx('xx-hop')
             say({ tag: '功行圆满', text: `【${c.name}】此局事了，道果+1。${q ? `“${q}”` : ''}` }, 6000)
             break
           case 'turn_abort':
+            setMood('idle')
             say({ tag: '收势', text: `【${c.name}】道友收了神通？张弛有道。` }, 5000)
             break
         }
@@ -233,6 +241,7 @@ module.exports = {
         if (meditate) {
           if (breakTimer.current) clearTimeout(breakTimer.current)
           setMeditate(false)
+          setMood('idle')
           say({ tag: '出定', text: '众灵宠收功，继续修行！' })
           return
         }
@@ -245,6 +254,7 @@ module.exports = {
         }
         arm()
         setMeditate(true)
+        setMood('sleep')
         say({ tag: '入定', text: '众灵宠盘坐运功……每 25 分钟提醒道友起身。' })
       }
 
@@ -319,7 +329,7 @@ module.exports = {
             onClick: () => petClick(i),
             title: `${c.name}（点我说话）`,
           },
-            React.createElement('div', { className: 'xx-av', dangerouslySetInnerHTML: { __html: xxAvatarSVG(c).svg } }),
+            React.createElement('div', { className: 'xx-av', dangerouslySetInnerHTML: { __html: xxAvatarSVG(c, mood).svg } }),
             React.createElement('div', { className: 'xx-name' }, c.name + (meditate ? ' · 定' : '')))),
           !party.length && React.createElement('div', { className: 'xx-petwrap', onClick: reroll },
             React.createElement('div', { className: 'xx-av' }),
