@@ -254,20 +254,41 @@ function paletteOf(t) {
 
 /** 游程合并 + 马赛克噪点（MC 纹理感）。 */
 function gridToRects(grid, palette) {
-  const rects = []
+  const at = (x, y) => (grid[y] && grid[y][x]) || '.'
+  // 自动裁边：算非空包围盒（+1 格呼吸边），让角色撑满画布
+  let minX = 16, minY = 16, maxX = -1, maxY = -1
   for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[y].length; x++) {
+      const ch = grid[y][x]
+      if (ch !== '.' && ch !== ' ') {
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+    }
+  }
+  if (maxX < 0) { minX = 0; minY = 0; maxX = 15; maxY = Math.min(15, grid.length - 1) }
+  minX = Math.max(0, minX - 1); minY = Math.max(0, minY - 1)
+  maxX = Math.min(15, maxX + 1); maxY = Math.min(grid.length - 1, maxY + 1)
+  const rects = []
+  for (let y = minY; y <= maxY; y++) {
     const row = grid[y]
-    let x = 0
-    while (x < row.length) {
-      const ch = row[x]
+    let x = minX
+    while (x <= maxX) {
+      let ch = row[x]
       if (ch === '.' || ch === ' ') { x++; continue }
+      // 眼白只许贴着眼黑，游离白点归主体色
+      if (ch === 'w' && !((at(x - 1, y) === 'e') || (at(x + 1, y) === 'e') || (at(x, y - 1) === 'e') || (at(x, y + 1) === 'e'))) {
+        ch = 'b'
+      }
       let run = 1
-      while (x + run < row.length && row[x + run] === ch) run++
+      while (x + run <= maxX && row[x + run] === ch) run++
       let fill = palette[ch]
       if (!fill) fill = `hsl(${(ch.charCodeAt(0) * 7) % 360},60%,50%)`
       // MC 纹理噪点：主体/亮部按确定性抖动混入暗像素
       if ((ch === 'b' || ch === 'l') && (x * 13 + y * 7) % 9 === 0) fill = palette.d || fill
-      rects.push(el('rect', { x, y, width: run, height: 1, fill }))
+      rects.push(el('rect', { x: x - minX, y: y - minY, width: run, height: 1, fill }))
       x += run
     }
   }
@@ -287,7 +308,7 @@ function closedGrid(grid) {
 function xxAvatarSVG(c) {
   const t = xxAnalyze(c)
   const palette = paletteOf(t)
-  const grid = TEMPLATES[t.kind] || T_HUMANOID
+  const grid = (TEMPLATES[t.kind] || T_HUMANOID).map((r) => (r + '................').slice(0, 16))
   const open = el('g', { class: 'xx-eo' }, gridToRects(grid, palette))
   const closed = el('g', { class: 'xx-ec' }, gridToRects(closedGrid(grid), palette))
   const svg = el('svg', {

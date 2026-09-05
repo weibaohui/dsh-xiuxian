@@ -153,17 +153,35 @@ class CharacterStore {
     return this.characters
   }
 
-  roll() {
+  weightedPick(excludeNames = []) {
     const list = this.ensure()
-    if (list.length === 0) return undefined
-    const weights = list.map((c) => (c.tier === 1 ? 6 : c.count >= 80 ? 3 : c.count >= 20 ? 2 : 1))
+    const cand = list.filter((c) => !excludeNames.includes(c.name))
+    if (cand.length === 0) return undefined
+    const weights = cand.map((c) => (c.tier === 1 ? 6 : c.count >= 80 ? 3 : c.count >= 20 ? 2 : 1))
     let total = weights.reduce((a, b) => a + b, 0)
     let r = Math.random() * total
-    for (let i = 0; i < list.length; i++) {
+    for (let i = 0; i < cand.length; i++) {
       r -= weights[i]
-      if (r <= 0) return list[i]
+      if (r <= 0) return cand[i]
     }
-    return list[list.length - 1]
+    return cand[cand.length - 1]
+  }
+
+  roll() {
+    return this.weightedPick()
+  }
+
+  /** 组队：n 位互不重复的随机角色。 */
+  party(n) {
+    const out = []
+    const exclude = []
+    for (let i = 0; i < n; i++) {
+      const c = this.weightedPick(exclude)
+      if (!c) break
+      exclude.push(c.name)
+      out.push(c)
+    }
+    return out
   }
 
   byName(name) {
@@ -402,6 +420,11 @@ module.exports = {
           }
           if (req.method === 'GET' && p.endsWith('/dsh-xiuxian/api/lexicon')) {
             sendJson(res, 200, { tools: TOOLS, events: EVENTS, vocab: VOCAB })
+            return
+          }
+          if (req.method === 'GET' && p.endsWith('/dsh-xiuxian/api/party')) {
+            const n = Math.min(3, Math.max(1, Number(url.searchParams.get('n') || 2)))
+            sendJson(res, 200, { characters: store.party(n) })
             return
           }
           if (req.method === 'GET' && p.endsWith('/dsh-xiuxian/api/feed')) {
