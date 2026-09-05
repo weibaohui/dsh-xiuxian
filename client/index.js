@@ -220,6 +220,45 @@ module.exports = {
       const reroll = () => loadParty(size).then((chars) => greet(chars))
         .catch(() => say('系统', '连不上修仙服务……'))
 
+      // ── 单只轮换：下一个/上一个（替换当前发言位角色，历史可回退）──
+      const rollRef = React.useRef({ history: [], cursor: -1 })
+      const pickNextChar = async (dir) => {
+        const h = rollRef.current
+        if (dir < 0 && h.cursor > 0) {
+          h.cursor -= 1
+          return { char: h.history[h.cursor], fromHistory: true }
+        }
+        const exclude = [...partyRef.current.map((p) => p.name),
+          ...(h.cursor >= 0 ? [h.history[h.cursor].name] : [])]
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const r = await api('/party?n=1').catch(() => null)
+          const c = r && r.characters && r.characters[0]
+          if (c && !exclude.includes(c.name)) {
+            h.history = h.history.slice(0, h.cursor + 1)
+            h.history.push(c)
+            h.cursor = h.history.length - 1
+            return { char: c, fromHistory: false }
+          }
+        }
+        return null
+      }
+      const cycleChar = (dir) => {
+        pickNextChar(dir).then((res) => {
+          if (!res) { say('哎呀', '一时寻不到新角色……'); return }
+          const c = res.char
+          setParty((prev) => {
+            const next = [...prev]
+            if (next.length === 0) next.push(c)
+            else next[Math.min(speaker.current, next.length - 1)] = c
+            return next
+          })
+          setFx('xx-hop')
+          setTimeout(() => setFx(''), 640)
+          say(c.name, (c.identity ? c.identity + '\n\n' : '') + (pickQuote(c) ? `“${pickQuote(c)}”` : ''),
+            res.fromHistory ? '（回看：可继续点上一位）' : undefined, 9000)
+        })
+      }
+
       // ── 事件联动 ──
       const flash = (cls) => { setFx(cls); setTimeout(() => setFx(''), 700) }
       const avatarsRef = React.useRef([])
@@ -451,10 +490,12 @@ module.exports = {
           onClick: (e) => e.stopPropagation() },
           React.createElement('div', { className: 'xx-mtitle' }, `显示模式（当前：${MODE_LABEL[curMode]}）`),
           MODES.map((m) => menuItem(`${mode.get() === m ? '✓' : ''} ${MODE_LABEL[m]}`, () => {
-            mode.set(m); setCurMode(m); loadParty(size, m).then((chars) => greet(chars))
+            mode.set(m); setCurMode(m)
           })),
           React.createElement('div', { className: 'xx-msep' }),
           menuItem(`👥 队伍人数 ${size + 1 > 3 ? 1 : size +1}`, () => setSize((s) => (s % 3) + 1)),
+          menuItem('⬅️ 上一个', () => cycleChar(-1)),
+          menuItem('➡️ 下一个', () => cycleChar(1)),
           menuItem('🔄 换一批', reroll),
           menuItem('💬 指点一二', () => {
             const c = partyRef.current[speaker.current] || partyRef.current[0]
@@ -576,7 +617,7 @@ module.exports = {
            ...avatars.map((a) => ({ ...a, isAvatar: true }))].slice(0, 3).map((c, i) => React.createElement('div', {
             key: c.name, className: 'xx-petwrap',
             onClick: () => petClick(i),
-            onDoubleClick: () => petDblClick(i),
+            onDoubleClick: () => cycleChar(1),
             title: `${c.name}（左键说话，双击换人，右键菜单）`,
           },
             React.createElement('div', { className: 'xx-av', dangerouslySetInnerHTML: { __html: xxAvatarSVG(c).svg } }),
