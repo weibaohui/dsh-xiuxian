@@ -722,6 +722,17 @@ window.__ModuleLoader__.load({
               say(c.name, (c.identity ? c.identity + '\n\n' : '') + (q ? `“${q}”` : ''), undefined, 9000)
             }
           }
+          // 双击 = 切换到队内下一位角色（循环），TA 附体打招呼
+          const petDblClick = (i) => {
+            if (party.length < 2) return
+            const nextIdx = (i + 1) % party.length
+            const c = party[nextIdx]
+            setFx('xx-hop')
+            setTimeout(() => setFx(''), 640)
+            speaker.current = nextIdx
+            const q = pickQuote(c)
+            say(`${c.name} 附体`, (c.identity ? c.identity + '\n\n' : '') + (q ? `“${q}”` : ''), undefined, 9000)
+          }
 
           const openMenu = (e) => {
             e.preventDefault()
@@ -897,7 +908,8 @@ window.__ModuleLoader__.load({
               party.map((c, i) => React.createElement('div', {
                 key: c.name, className: 'xx-petwrap',
                 onClick: () => petClick(i),
-                title: `${c.name}（左键说话，右键菜单）`,
+                onDoubleClick: () => petDblClick(i),
+                title: `${c.name}（左键说话，双击换人，右键菜单）`,
               },
                 React.createElement('div', { className: 'xx-av', dangerouslySetInnerHTML: { __html: xxAvatarSVG(c).svg } }),
                 React.createElement('div', { className: 'xx-name' }, c.name + (meditate ? ' · 定' : '')))),
