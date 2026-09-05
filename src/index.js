@@ -422,6 +422,11 @@ module.exports = {
             sendJson(res, 200, { tools: TOOLS, events: EVENTS, vocab: VOCAB })
             return
           }
+          if (req.method === 'GET' && p.endsWith('/dsh-xiuxian/api/list')) {
+            const list = store.ensure()
+            sendJson(res, 200, { characters: list })
+            return
+          }
           if (req.method === 'GET' && p.endsWith('/dsh-xiuxian/api/party')) {
             const n = Math.min(3, Math.max(1, Number(url.searchParams.get('n') || 2)))
             sendJson(res, 200, { characters: store.party(n) })

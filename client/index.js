@@ -46,6 +46,30 @@ const STYLE = `
 .xx-mtitle{padding:5px 10px 2px;color:#5a6678;font-size:10.5px}
 .xx-al{display:flex;align-items:center;gap:6px;margin:4px 8px 2px;color:#8a94a0;font-size:10.5px}
 .xx-al input[type=range]{flex:1;height:3px;accent-color:#d4b06a;cursor:pointer}
+/* 图鉴选宠面板 */
+.xx-dex{position:fixed;inset:0;z-index:1300;background:rgba(8,11,16,.72);display:flex;align-items:center;justify-content:center}
+.xx-dexbox{width:560px;max-height:78vh;background:#161c26;border:1px solid #3a4656;border-radius:14px;
+  box-shadow:0 18px 60px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden}
+.xx-dexhd{padding:12px 14px 8px;border-bottom:1px solid #2a3441}
+.xx-dexhd h3{margin:0 0 8px;color:#d4b06a;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+.xx-dexhd h3 span{cursor:pointer;color:#7d8894;font-size:13px}
+.xx-dexhd h3 span:hover{color:#d4b06a}
+.xx-dexq{width:100%;padding:7px 10px;background:#0f141b;border:1px solid #2a3441;border-radius:7px;color:#d8dee6;font-size:12.5px;outline:none;margin-bottom:7px}
+.xx-dexq:focus{border-color:#d4b06a}
+.xx-dexbar{display:flex;gap:5px;align-items:center;font-size:11px;color:#7d8894}
+.xx-dexbar .xx-mi{padding:4px 8px;font-size:11px}
+.xx-dexbar .xx-sep{flex:1}
+.xx-dexlist{flex:1;overflow-y:auto;padding:6px 10px}
+.xx-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;border-bottom:1px solid #1f2833}
+.xx-row:hover{background:#1e2836}
+.xx-row .xx-rn{width:120px;font-weight:600;color:#d4b06a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.xx-row .xx-ri{flex:1;color:#8fa2b8;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xx-row .xx-rc{color:#5a6678;font-size:10.5px;flex-shrink:0;width:52px;text-align:right}
+.xx-row .xx-rb{flex-shrink:0;background:#f4ead0;border:1px solid #e0cd96;border-radius:6px;color:#6b5a26;
+  font-size:10.5px;padding:2px 7px;cursor:pointer}
+.xx-row .xx-rb:hover{background:#ffe9a8}
+.xx-row .xx-rb.bagged{background:#26303e;color:#9db4cc;border-color:#3a4656;cursor:default}
+.xx-dexempty{padding:30px;text-align:center;color:#5a6678}
 `
 
 function ensureStyle() {
@@ -138,6 +162,7 @@ module.exports = {
         return Number.isFinite(v) ? Math.min(200, Math.max(64, v)) : 132
       })
       const [fx, setFx] = React.useState('')
+      const [dex, setDex] = React.useState(undefined)      // {q, sort, filter, all}
       const [pos, setPos] = React.useState(undefined)
       const [drag, setDrag] = React.useState(undefined)
       const breakTimer = React.useRef(undefined)
@@ -371,6 +396,13 @@ module.exports = {
             say(c.name, q ? `“${q}”` : '沉吟片刻，暂无一语。', undefined, 8000)
           }),
           React.createElement('div', { className: 'xx-msep' }),
+          menuItem('🔍 图鉴选宠', async () => {
+            say('图鉴', '翻开修仙界名册……', undefined, 4000)
+            const r = await api('/list').catch(() => null)
+            if (!r) { say('哎呀', '连不上修仙服务……'); return }
+            setDex({ q: '', sort: 'count', filter: 'all', all: r.characters })
+          }),
+          React.createElement('div', { className: 'xx-msep' }),
           menuItem('📜 复制技能', copySkill),
           menuItem('📖 生平玉简', showBio),
           menuItem('✨ 话术上身', copyIncantation),
@@ -398,6 +430,72 @@ module.exports = {
                 try { localStorage.setItem('xx-alpha', String(v)) } catch {}
               },
             }))),
+
+        // 图鉴选宠面板
+        dex && React.createElement('div', { className: 'xx-dex', onClick: () => setDex(undefined) },
+          React.createElement('div', { className: 'xx-dexbox', onClick: (e) => e.stopPropagation() },
+            React.createElement('div', { className: 'xx-dexhd' },
+              React.createElement('h3', null,
+                '修仙界名册',
+                React.createElement('span', { onClick: () => setDex(undefined) }, '✕')),
+              React.createElement('input', {
+                className: 'xx-dexq', placeholder: '搜索名字 / 别名 / 身份…', autoFocus: true,
+                value: dex.q, onInput: (e) => setDex({ ...dex, q: e.target.value }),
+              }),
+              React.createElement('div', { className: 'xx-dexbar' },
+                [['all', '全部'], ['t1', '主要角色'], ['bag', '已存袋'], ['inparty', '已入队']].map(([f, label]) =>
+                  React.createElement('div', {
+                    key: f, className: 'xx-mi', style: dex.filter === f ? { background: '#26303e', color: '#d4b06a' } : undefined,
+                    onClick: () => setDex({ ...dex, filter: f }),
+                  }, label)),
+                React.createElement('span', { className: 'xx-sep' }),
+                React.createElement('div', { className: 'xx-mi', style: { color: '#d4b06a' },
+                  onClick: () => setDex({ ...dex, sort: dex.sort === 'count' ? 'name' : (dex.sort === 'name' ? 'tier' : 'count') }),
+                }, '排序: ' + (dex.sort === 'count' ? '出场↑' : dex.sort === 'name' ? '名字' : '主角优先')),
+                React.createElement('span', null, `${(dex.filtered || dex.all).length} 只`)),
+            ),
+            React.createElement('div', { className: 'xx-dexlist' },
+              (() => {
+                const kw = dex.q.trim().toLowerCase()
+                let rows = dex.all
+                if (kw) rows = rows.filter((c) => (c.name + c.alias + ' ' + c.identity).toLowerCase().includes(kw))
+                if (dex.filter === 't1') rows = rows.filter((c) => c.tier === 1)
+                if (dex.filter === 'bag') rows = rows.filter((c) => bag.has(c.name))
+                if (dex.filter === 'inparty') rows = rows.filter((c) => party.some((p) => p.name === c.name))
+                rows = [...rows].sort((a, b) =>
+                  dex.sort === 'name' ? a.name.localeCompare(b.name, 'zh') :
+                  dex.sort === 'tier' ? (a.tier - b.tier) || (b.count - a.count) :
+                  b.count - a.count)
+                dex.filtered = rows
+                if (!rows.length) return React.createElement('div', { className: 'xx-dexempty' }, '名册中无此角色')
+                return rows.slice(0, 200).map((c) => React.createElement('div', { key: c.name, className: 'xx-row' },
+                  React.createElement('span', { className: 'xx-rn' }, (c.tier === 1 ? '👑' : '') + c.name),
+                  React.createElement('span', { className: 'xx-ri' }, c.identity || c.alias || ''),
+                  React.createElement('span', { className: 'xx-rc' }, `${c.count}章`),
+                  React.createElement('button', {
+                    className: 'xx-rb' + (party.some((p) => p.name === c.name) ? ' bagged' : ''),
+                    onClick: () => {
+                      setParty((prev) => {
+                        const next = [...prev]
+                        const idx = next.findIndex((p) => p.name === c.name)
+                        if (idx >= 0) next.splice(idx, 1)
+                        else { if (next.length >= 3) next.pop(); next.push(c) }
+                        speaker.current = 0
+                        return next
+                      })
+                      say(c.name, `${c.name}入队！` + (pickQuote(c) ? ` “${pickQuote(c)}”` : ''), undefined, 5000)
+                    },
+                  }, party.some((p) => p.name === c.name) ? '离队' : '+入队'),
+                  React.createElement('button', {
+                    className: 'xx-rb' + (bag.has(c.name) ? ' bagged' : ''),
+                    onClick: () => {
+                      if (bag.has(c.name)) { bag.remove(c.name); setDex({ ...dex }) }
+                      else { bag.add([c]); setDex({ ...dex }); say('储物袋', `${c.name}已收入袋中。`, undefined, 4000) }
+                    },
+                  }, bag.has(c.name) ? '已存袋' : '📥存袋'),
+                ))
+              })()),
+          )),
 
         // 宠物舞台
         React.createElement('div', {

@@ -1,6 +1,6 @@
 {
   "name": "@weibaohui/dsh-xiuxian",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "description": "dsh 插件 · 修仙陪伴：随机唤醒《凡人修仙传》角色，MC像素风桌宠与 agent 会话实时联动。游戏式对话框、右键法宝菜单、储物袋收藏与三种显示模式（随机/袋随机/固定），可导出 Codex 桌宠。",
   "license": "MIT",
   "keywords": [
