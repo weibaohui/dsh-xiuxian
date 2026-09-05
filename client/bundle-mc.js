@@ -537,6 +537,8 @@ window.__ModuleLoader__.load({
           const [menu, setMenu] = React.useState(undefined) // {x, y}
           const [meditate, setMeditate] = React.useState(false)
           const [linked, setLinked] = React.useState(true)
+          const [avatars, setAvatars] = React.useState([])        // 子代理化身宠物 {..char, sessionId, lastAt}
+          const poolRef = React.useRef([])                        // 化身候选（随机替补）
           const [alpha, setAlpha] = React.useState(() => {
             const v = parseFloat(localStorage.getItem('xx-alpha'))
             return Number.isFinite(v) ? Math.min(1, Math.max(0.35, v)) : 0.94
@@ -588,6 +590,9 @@ window.__ModuleLoader__.load({
           }, [])
 
           React.useEffect(() => { loadParty(size) }, [size, curMode, loadParty])
+          React.useEffect(() => {
+            api('/party?n=3').then((r) => { poolRef.current = r.characters || [] }).catch(() => {})
+          }, [])
 
           const greet = (chars) => {
             const c = chars[0]
@@ -601,9 +606,34 @@ window.__ModuleLoader__.load({
 
           // ── 事件联动 ──
           const flash = (cls) => { setFx(cls); setTimeout(() => setFx(''), 700) }
+          const avatarsRef = React.useRef([])
+          avatarsRef.current = avatars
+
+          // 子代理活动 → 化身宠物现身（同 sessionId 复用；总量≤3）
+          const ensureAvatar = (sessionId) => {
+            if (avatarsRef.current.some((a) => a.sessionId === sessionId)) {
+              setAvatars((prev) => prev.map((a) => (a.sessionId === sessionId ? { ...a, lastAt: Date.now() } : a)))
+              return true
+            }
+            if (partyRef.current.length + avatarsRef.current.length >= 3) return false
+            const cand = poolRef.current.find((c) =>
+              !avatarsRef.current.some((a) => a.name === c.name) &&
+              !partyRef.current.some((p) => p.name === c.name))
+            if (!cand) return false
+            poolRef.current = poolRef.current.filter((c) => c.name !== cand.name)
+            setAvatars((prev) => [...prev, { ...cand, sessionId, lastAt: Date.now() }])
+            return true
+          }
+          const clearAvatars = () => setAvatars([])
           const react = (ev) => {
             if (!linked || !partyRef.current.length) return
-            const now = Date.now()
+            if (ev.sub && ev.kind !== 'turn_end') {
+              const appeared = ensureAvatar(ev.sessionId)
+              if (appeared) {
+                const c = avatarsRef.current.find((a) => a.sessionId === ev.sessionId)
+                if (c) say(`${c.name} · 化身现身`, '身外化身自虚空迈步而出，协同作战！', undefined, 4500)
+              }
+            }
             if (ev.kind === 'tool_call') {
               setMoodRef.current && setMoodRef.current('working')
               if (now - lastBubbleAt.current < 900) { setFx('xx-hop'); return }
@@ -637,11 +667,19 @@ window.__ModuleLoader__.load({
                 setFx('xx-shake')
                 say('天劫雷音', `【${ev.tool || '法器'}】轰然炸响！\n${q ? `“${q}”` : `${c.name}：道友莫慌，且看如何补天。`}`, undefined, 7000)
                 break
-              case 'turn_end':
+              case 'turn_end': {
                 setMoodRef.current && setMoodRef.current('idle')
                 setFx('xx-hop')
+                if (avatarsRef.current.length) {
+                  const names = avatarsRef.current.map((a) => a.name).join('、')
+                  setAvatars([])
+                  poolRef.current = []
+                  say('化身归位', `【${names}】功成身退，化作流光归返虚空。`, undefined, 5000)
+                  break
+                }
                 say('功行圆满', `【${c.name}】此局事了，道果+1。${q ? `“${q}”` : ''}`, undefined, 6000)
                 break
+              }
               case 'turn_abort':
                 setMoodRef.current && setMoodRef.current('idle')
                 say('收势', `【${c.name}】道友收了神通？张弛有道。`, undefined, 5000)
@@ -658,6 +696,8 @@ window.__ModuleLoader__.load({
                   lastId.current = Math.max(lastId.current, ev.id)
                   react(ev)
                 }
+                // 化身闲置 90 秒自动退场
+                setAvatars((prev) => prev.filter((a) => Date.now() - a.lastAt < 90000))
               }).catch(() => {})
             }
             const iv = setInterval(tick, 1600)
@@ -905,14 +945,16 @@ window.__ModuleLoader__.load({
               onMouseDown: onDown,
               onContextMenu: openMenu,
             },
-              party.map((c, i) => React.createElement('div', {
+              [...party.map((c) => ({ ...c, isAvatar: false })),
+               ...avatars.map((a) => ({ ...a, isAvatar: true }))].slice(0, 3).map((c, i) => React.createElement('div', {
                 key: c.name, className: 'xx-petwrap',
                 onClick: () => petClick(i),
                 onDoubleClick: () => petDblClick(i),
                 title: `${c.name}（左键说话，双击换人，右键菜单）`,
               },
                 React.createElement('div', { className: 'xx-av', dangerouslySetInnerHTML: { __html: xxAvatarSVG(c).svg } }),
-                React.createElement('div', { className: 'xx-name' }, c.name + (meditate ? ' · 定' : '')))),
+                React.createElement('div', { className: 'xx-name' },
+                  (c.isAvatar ? '🔮' : '') + c.name + (meditate ? ' · 定' : '')))),
               !party.length && React.createElement('div', { className: 'xx-petwrap', onClick: reroll },
                 React.createElement('div', { className: 'xx-av' }),
                 React.createElement('div', { className: 'xx-name' }, '唤醒中…'))),

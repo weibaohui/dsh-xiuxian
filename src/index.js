@@ -443,7 +443,8 @@ module.exports = {
             feedSeq += 1
             feed.push({ id: feedSeq, at: new Date().toISOString(),
                         kind: body.kind || 'tool_call', tool: body.tool, arg: body.arg,
-                        text: body.text, sessionId: 'inject', sub: false })
+                        text: body.text, sessionId: body.sessionId || 'inject',
+                        sub: body.sub === true })
             if (feed.length > FEED_MAX) feed.splice(0, feed.length - FEED_MAX)
             sendJson(res, 200, { id: feedSeq })
             return
