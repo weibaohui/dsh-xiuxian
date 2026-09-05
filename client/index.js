@@ -1,11 +1,10 @@
 'use strict'
 
 /**
- * dsh-xiuxian — Client half（群宠版）
- * 屏幕角落 1-3 只 Q 版像素灵宠同屏，订阅真实会话事件流：
- *   - 每个新会话随机组队（角色互不重复，主要角色权重高）
- *   - 事件到来时按各自人设轮流出招/说话：道友发问→施法→心声道→天劫雷音→功行圆满
- *   - 👥 按钮切换组队人数（1/2/3）；透明度滑杆；打坐周期
+ * dsh-xiuxian — Client half（v0.9 对话/控制剥离版）
+ *  - 对话气泡 = 纯游戏对话框（角色名 + 文字，自动消散，无按钮）
+ *  - 全部功能移入宠物右键菜单
+ *  - 储物袋：收入的角色持久化；显示模式三选：随机 / 储物袋随机 / 固定
  */
 
 const STYLE = `
@@ -14,9 +13,9 @@ const STYLE = `
 @keyframes xx-ecblink{0%,88%,100%{opacity:0}92%,96%{opacity:1}}
 @keyframes xx-hop{0%{transform:translateY(0)}30%{transform:translateY(-10px) rotate(-4deg)}60%{transform:translateY(0)}80%{transform:translateY(-3px)}100%{transform:translateY(0)}}
 @keyframes xx-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px) rotate(-3deg)}50%{transform:translateX(3px) rotate(3deg)}75%{transform:translateX(-2px)}}
-@keyframes xx-pop{0%{transform:scale(.7) translateY(6px);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1) translateY(0);opacity:1}}
-@keyframes xx-tearfall{0%{transform:translateY(0);opacity:1}100%{transform:translateY(5px);opacity:0}}
+@keyframes xx-pop{0%{transform:scale(.85) translateY(6px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
 @keyframes xx-zzz{0%{transform:translateY(0);opacity:0}30%{opacity:.9}100%{transform:translateY(-12px) translateX(5px);opacity:0}}
+@keyframes xx-tearfall{0%{transform:translateY(0);opacity:1}100%{transform:translateY(5px);opacity:0}}
 .xx-stage{position:fixed;right:26px;bottom:18px;z-index:1200;display:flex;gap:4px;align-items:flex-end;
   font:13px/1.6 "PingFang SC","Microsoft YaHei",sans-serif;user-select:none}
 .xx-petwrap{width:calc(var(--xx-pet-size) * 1px);text-align:center;cursor:grab;animation:xx-float 3.4s ease-in-out infinite}
@@ -28,29 +27,29 @@ const STYLE = `
 .xx-stage.xx-hop .xx-av{animation:xx-hop .6s ease}
 .xx-stage.xx-cast .xx-av{filter:drop-shadow(0 0 10px #ffd97a) brightness(1.2)}
 .xx-stage.xx-shake .xx-av{animation:xx-shake .5s ease}
-.xx-bubble{position:fixed;right:20px;bottom:158px;width:252px;background:#fffdf6;color:#3a332a;
-  border:1.5px solid #d4b06a;border-radius:12px;padding:8px 10px 7px;z-index:1199;
-  box-shadow:0 8px 22px rgba(0,0,0,.32);animation:xx-pop .26s ease;font-size:11.5px;line-height:1.55}
-.xx-bubble::after{content:"";position:absolute;right:40px;bottom:-8px;width:13px;height:13px;background:#fffdf6;
+/* 游戏对话框：仅名字+文字 */
+.xx-bubble{position:fixed;right:20px;bottom:196px;min-width:210px;max-width:300px;background:rgba(16,20,28,.94);
+  color:#e8e2d0;border:1.5px solid #d4b06a;border-radius:4px 12px 12px 12px;padding:10px 13px 9px;z-index:1199;
+  box-shadow:0 8px 26px rgba(0,0,0,.5);animation:xx-pop .22s ease;font-size:12.5px;line-height:1.7;user-select:text}
+.xx-bubble::after{content:"";position:absolute;right:36px;bottom:-8px;width:13px;height:13px;background:rgba(16,20,28,.94);
   border-right:1.5px solid #d4b06a;border-bottom:1.5px solid #d4b06a;transform:rotate(45deg)}
-.xx-btag{display:inline-block;background:#5a4a1e;color:#ffd97a;border-radius:7px;padding:0 7px;font-size:10px;margin-bottom:4px}
-.xx-btext{max-height:126px;overflow-y:auto;white-space:pre-wrap;font-size:11.5px;user-select:text}
-.xx-bnote{color:#a08c5a;font-size:10px;margin-top:4px}
-.xx-tools{display:flex;gap:4px;margin-top:6px;padding-top:5px;border-top:1px dashed #e3d5ae}
-.xx-tbtn{flex:1;background:#f4ead0;border:1px solid #e0cd96;border-radius:8px;color:#6b5a26;
-  font-size:13px;line-height:1;padding:4px 0;cursor:pointer;text-align:center}
-.xx-tbtn:hover{background:#ffe9a8}
-.xx-tbtn.on{background:#d4b06a;color:#fff}
-.xx-al{display:flex;align-items:center;gap:6px;margin-top:5px;color:#a08c5a;font-size:10px}
+.xx-who{color:#d4b06a;font-weight:700;font-size:12.5px;margin-bottom:3px;letter-spacing:1px}
+.xx-btext{max-height:150px;overflow-y:auto;white-space:pre-wrap}
+.xx-bnote{color:#8a7c52;font-size:10px;margin-top:4px}
+/* 右键菜单 */
+.xx-menu{position:fixed;z-index:1250;width:196px;background:#161c26;border:1px solid #3a4656;border-radius:10px;
+  box-shadow:0 10px 32px rgba(0,0,0,.55);padding:5px;font:12.5px/1.5 "PingFang SC",sans-serif;color:#d8dee6;animation:xx-pop .16s ease}
+.xx-mi{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.xx-mi:hover{background:#26303e;color:#d4b06a}
+.xx-mi .xx-ck{width:14px;text-align:center;color:#d4b06a}
+.xx-msep{height:1px;background:#2a3441;margin:4px 6px}
+.xx-mtitle{padding:5px 10px 2px;color:#5a6678;font-size:10.5px}
+.xx-al{display:flex;align-items:center;gap:6px;margin:4px 8px 2px;color:#8a94a0;font-size:10.5px}
 .xx-al input[type=range]{flex:1;height:3px;accent-color:#d4b06a;cursor:pointer}
-.xx-trigger{display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;
-  color:#9db4cc;font:12px/1 "PingFang SC",sans-serif;padding:6px 8px;border-radius:6px}
-.xx-trigger:hover{background:#222c39;color:#d4b06a}
 `
 
-const STYLE_VER = 'v5'
 function ensureStyle() {
-  const id = `dsh-xiuxian-style-${STYLE_VER}`
+  const id = 'dsh-xiuxian-style-v9'
   if (!document.getElementById(id)) {
     document.querySelectorAll('style[id^="dsh-xiuxian-style"]').forEach((n) => n.remove())
     const tag = document.createElement('style')
@@ -87,6 +86,28 @@ const spellOf = (tool) => {
 const pickQuote = (c) => (c && c.quotes && c.quotes.length)
   ? c.quotes[Math.floor(Math.random() * c.quotes.length)] : ''
 
+/* ── 储物袋 & 显示模式（localStorage）── */
+const bag = {
+  list() { try { return JSON.parse(localStorage.getItem('xx-bag') || '[]') } catch { return [] } },
+  save(list) { try { localStorage.setItem('xx-bag', JSON.stringify(list)) } catch {} },
+  has(name) { return this.list().some((c) => c.name === name) },
+  add(characters) {
+    const cur = this.list()
+    for (const c of characters) {
+      if (!cur.some((x) => x.name === c.name)) cur.push({ name: c.name, identity: c.identity, tier: c.tier, count: c.count })
+    }
+    this.save(cur)
+    return cur
+  },
+  remove(name) { this.save(this.list().filter((c) => c.name !== name)) },
+}
+const MODES = ['random', 'bag-random', 'fixed']
+const MODE_LABEL = { random: '随机', 'bag-random': '储物袋随机', fixed: '固定队伍' }
+const mode = {
+  get() { const v = localStorage.getItem('xx-mode'); return MODES.includes(v) ? v : 'random' },
+  set(v) { try { localStorage.setItem('xx-mode', v) } catch {} },
+}
+
 module.exports = {
   name: '@weibaohui/dsh-xiuxian',
   inject: ['slots'],
@@ -97,25 +118,26 @@ module.exports = {
     ensureStyle()
 
     function XiuxianPage() {
-      const [party, setParty] = React.useState([])          // 角色数组（1-3）
+      const [party, setParty] = React.useState([])
       const [size, setSize] = React.useState(() => {
         const v = Number(localStorage.getItem('xx-party'))
         return [1, 2, 3].includes(v) ? v : 1
       })
-      const [msg, setMsg] = React.useState(undefined)
-      const [open, setOpen] = React.useState(false)
+      const [curMode, setCurMode] = React.useState(mode.get())
+      const [msg, setMsg] = React.useState(undefined)   // {who, text, note}
+      const [bubbleOpen, setBubbleOpen] = React.useState(false)
+      const [menu, setMenu] = React.useState(undefined) // {x, y}
       const [meditate, setMeditate] = React.useState(false)
       const [linked, setLinked] = React.useState(true)
       const [alpha, setAlpha] = React.useState(() => {
         const v = parseFloat(localStorage.getItem('xx-alpha'))
-        return Number.isFinite(v) ? Math.min(1, Math.max(0.35, v)) : 0.92
+        return Number.isFinite(v) ? Math.min(1, Math.max(0.35, v)) : 0.94
       })
       const [petSize, setPetSize] = React.useState(() => {
         const v = Number(localStorage.getItem('xx-pet-size'))
         return Number.isFinite(v) ? Math.min(200, Math.max(64, v)) : 132
       })
       const [fx, setFx] = React.useState('')
-      const [mood, setMood] = React.useState('idle')   // idle | working | failed | sleep
       const [pos, setPos] = React.useState(undefined)
       const [drag, setDrag] = React.useState(undefined)
       const breakTimer = React.useRef(undefined)
@@ -123,87 +145,102 @@ module.exports = {
       const stageRef = React.useRef(undefined)
       const lastId = React.useRef(0)
       const lastBubbleAt = React.useRef(0)
-      const speaker = React.useRef(0)                        // 轮流出场的角色下标
+      const speaker = React.useRef(0)
+      const partyRef = React.useRef([])
+      partyRef.current = party
 
-      const say = (m, ttl) => {
-        setMsg(m)
-        setOpen(true)
+      const say = (who, text, note, ttl) => {
+        setMsg({ who, text, note })
+        setBubbleOpen(true)
         if (hideTimer.current) clearTimeout(hideTimer.current)
-        if (ttl !== 0) hideTimer.current = setTimeout(() => setOpen(false), ttl || 12000)
-      }
-      const nextSpeaker = () => {
-        speaker.current = party.length ? (speaker.current + 1) % party.length : 0
-        return party[speaker.current]
+        if (ttl !== 0) hideTimer.current = setTimeout(() => setBubbleOpen(false), ttl || 9000)
       }
 
-      const loadParty = (n) => api(`/party?n=${n}`).then((r) => {
-        setParty(r.characters)
-        speaker.current = 0
-        return r.characters
-      }).catch(() => [])
+      /** 按 显示模式 装载队伍。 */
+      const loadParty = React.useCallback((n, m) => {
+        const curMode2 = m || mode.get()
+        if (curMode2 === 'fixed') {
+          const saved = bag.list().slice(0, n)
+          if (saved.length) { setParty(saved); speaker.current = 0; return Promise.resolve(saved) }
+          // 储物袋为空则退化为随机
+        }
+        if (curMode2 === 'bag-random') {
+          const pool = bag.list()
+          if (pool.length) {
+            const picked = [...pool].sort(() => Math.random() - 0.5).slice(0, n)
+            setParty(picked); speaker.current = 0
+            return Promise.resolve(picked)
+          }
+        }
+        return api(`/party?n=${n}`).then((r) => {
+          setParty(r.characters); speaker.current = 0
+          return r.characters
+        }).catch(() => [])
+      }, [])
 
-      React.useEffect(() => { loadParty(size) }, [size])
-      React.useEffect(() => {
-        try { localStorage.setItem('xx-party', String(size)) } catch {}
-      }, [size])
+      React.useEffect(() => { loadParty(size) }, [size, curMode, loadParty])
 
       const greet = (chars) => {
         const c = chars[0]
         if (!c) return
-        say({ tag: `${c.name} 等附体`, text: chars.map((x) => `【${x.name}】${x.identity.slice(0, 40)}`).join('\n'),
-              note: '点宠物蹦跶，圆钮是法宝，👥可增减队友' })
+        say(c.name, chars.length > 1
+          ? chars.map((x) => `【${x.name}】已入阵`).join('\n')
+          : (pickQuote(c) ? `“${pickQuote(c)}”` : (c.identity || '')))
       }
-
       const reroll = () => loadParty(size).then((chars) => greet(chars))
-        .catch(() => say({ tag: '哎呀', text: '连不上修仙服务……' }))
+        .catch(() => say('系统', '连不上修仙服务……'))
 
-      // ── 事件联动：多角色按事件轮流出招/说话 ──
+      // ── 事件联动 ──
+      const flash = (cls) => { setFx(cls); setTimeout(() => setFx(''), 700) }
       const react = (ev) => {
-        if (!linked || !party.length) return
+        if (!linked || !partyRef.current.length) return
         const now = Date.now()
         if (ev.kind === 'tool_call') {
+          setMoodRef.current && setMoodRef.current('working')
           if (now - lastBubbleAt.current < 900) { setFx('xx-hop'); return }
           lastBubbleAt.current = now
           const sp = spellOf(ev.tool)
           flash('xx-cast')
-          if (party.length > 1) {
-            const lines = party.map((c) => `【${c.name}】${sp.cast}`).join('\n')
-            say({ tag: `群起施法 · ${sp.name}${ev.sub ? '（化身）' : ''}`, text: lines + (ev.arg ? `\n▸ ${ev.arg}` : '') }, 6000)
+          const team = partyRef.current
+          if (team.length > 1) {
+            say(`群起施法 · ${sp.name}`, team.map((c) => `【${c.name}】${sp.cast}`).join('\n') + (ev.arg ? `\n▸ ${ev.arg}` : ''), undefined, 6000)
           } else {
-            const who = party[0]
-            say({ tag: `${sp.name}`, text: `${sp.cast}\n【${ev.tool}】${ev.arg || ''}` }, 6000)
+            say(team[0].name, `${sp.cast}\n【${ev.tool}】${ev.arg || ''}`, undefined, 6000)
           }
           return
         }
-        const c = nextSpeaker()
+        speaker.current = partyRef.current.length ? (speaker.current + 1) % partyRef.current.length : 0
+        const c = partyRef.current[speaker.current]
         if (!c) return
         const q = pickQuote(c)
         switch (ev.kind) {
           case 'user_msg':
             setFx('xx-hop')
-            say({ tag: '道友发问', text: (ev.text ? `“${ev.text}”\n\n` : '') + `【${c.name}】凝神细听……` }, 5000)
+            say(c.name, (ev.text ? `“${ev.text}”\n\n` : '') + `凝神细听……`, undefined, 5000)
             break
           case 'assistant_msg':
             if (now - lastBubbleAt.current < 1200) return
             lastBubbleAt.current = now
-            say({ tag: `${c.name} · 心声道`, text: `“${ev.text}”` }, 7000)
+            say(`${c.name} · 心声道`, `“${ev.text}”`, undefined, 7000)
             break
           case 'tool_error':
-            setMood('failed')
+            setMoodRef.current && setMoodRef.current('failed')
             setFx('xx-shake')
-            say({ tag: '天劫雷音', text: `【${ev.tool || '法器'}】轰然炸响！\n${q ? `“${q}”` : `${c.name}：道友莫慌，且看如何补天。`}` }, 7000)
+            say('天劫雷音', `【${ev.tool || '法器'}】轰然炸响！\n${q ? `“${q}”` : `${c.name}：道友莫慌，且看如何补天。`}`, undefined, 7000)
             break
           case 'turn_end':
-            setMood('idle')
+            setMoodRef.current && setMoodRef.current('idle')
             setFx('xx-hop')
-            say({ tag: '功行圆满', text: `【${c.name}】此局事了，道果+1。${q ? `“${q}”` : ''}` }, 6000)
+            say('功行圆满', `【${c.name}】此局事了，道果+1。${q ? `“${q}”` : ''}`, undefined, 6000)
             break
           case 'turn_abort':
-            setMood('idle')
-            say({ tag: '收势', text: `【${c.name}】道友收了神通？张弛有道。` }, 5000)
+            setMoodRef.current && setMoodRef.current('idle')
+            say('收势', `【${c.name}】道友收了神通？张弛有道。`, undefined, 5000)
             break
         }
       }
+      // mood 由 CSS class 简化处理（failed 抖动/working 施法光晕已足够表达）
+      const setMoodRef = { current: undefined }
 
       React.useEffect(() => {
         const tick = () => {
@@ -219,11 +256,11 @@ module.exports = {
       })
 
       const copyText = async (text, okNote) => {
-        try { await navigator.clipboard.writeText(text); say({ tag: '法宝到手', text: okNote }) }
-        catch { say({ tag: '哎呀', text: '剪贴板权限不给力……' }) }
+        try { await navigator.clipboard.writeText(text); say('法宝到手', okNote) }
+        catch { say('哎呀', '剪贴板权限不给力……') }
       }
       const copySkill = () => {
-        const c = party[speaker.current] || party[0]
+        const c = partyRef.current[speaker.current] || partyRef.current[0]
         if (!c) return
         fetch(`/dsh-xiuxian/api/skill?name=${encodeURIComponent(c.name)}`).then((r) => r.text())
           .then((txt) => copyText(txt, `「${c.name}」的技能已进剪贴板——贴进会话即附体`))
@@ -233,9 +270,9 @@ module.exports = {
           .then((t) => copyText(t, '话术已上身——贴进会话，agent 从此用法术腔干活'))
       }
       const showBio = () => {
-        const c = party[speaker.current] || party[0]
+        const c = partyRef.current[speaker.current] || partyRef.current[0]
         if (!c) return
-        say({ tag: `${c.name} · 生平`, text: '玉简展开中……' }, 0)
+        say(`${c.name} · 生平`, '玉简展开中……', undefined, 0)
         fetch(`/dsh-xiuxian/api/bio?name=${encodeURIComponent(c.name)}`)
           .then((r) => (r.ok ? r.text() : Promise.reject())).then((t) => setMsg((m) => ({ ...m, text: t })))
           .catch(() => setMsg((m) => ({ ...m, text: '（暂无生平玉简）' })))
@@ -244,33 +281,50 @@ module.exports = {
         if (meditate) {
           if (breakTimer.current) clearTimeout(breakTimer.current)
           setMeditate(false)
-          setMood('idle')
-          say({ tag: '出定', text: '众灵宠收功，继续修行！' })
+          say('出定', '众灵宠收功，继续修行！')
           return
         }
         const arm = () => {
           breakTimer.current = setTimeout(() => {
-            const c = party[Math.floor(Math.random() * (party.length || 1))]
-            say({ tag: '打坐周期', text: `【${c ? c.name : '灵宠'}】闭关已满一炷香（25分钟），道友起身活动周天～` })
+            const c = partyRef.current[Math.floor(Math.random() * (partyRef.current.length || 1))]
+            say('打坐周期', `【${c ? c.name : '灵宠'}】闭关已满一炷香（25分钟），道友起身活动周天～`)
             arm()
           }, 25 * 60 * 1000)
         }
         arm()
         setMeditate(true)
-        setMood('sleep')
-        say({ tag: '入定', text: '众灵宠盘坐运功……每 25 分钟提醒道友起身。' })
+        say('入定', '众灵宠盘坐运功……每 25 分钟提醒道友起身。')
+      }
+      const saveToBag = () => {
+        const before = bag.list().length
+        const after = bag.add(partyRef.current).length
+        say('储物袋', `已收入 ${partyRef.current.map((c) => c.name).join('、')}。` +
+          (after > before ? `储物袋现有 ${after} 位。` : '（已在袋中）'))
       }
 
       const petClick = (i) => {
         setFx('xx-hop')
         setTimeout(() => setFx(''), 640)
-        if (open && msg) { setOpen(false); return }
+        if (bubbleOpen) { setBubbleOpen(false); return }
         const c = party[i]
         if (c) {
           speaker.current = i
-          say({ tag: `${c.name} 附体`, text: (c.identity ? c.identity + '\n\n' : '') + (pickQuote(c) ? `“${pickQuote(c)}”` : '') })
+          say(c.name, c.identity ? `${c.identity}\n\n` : '' + (pickQuote(c) ? `“${pickQuote(c)}”` : ''),
+            '右键宠物打开法宝菜单', 9000)
         }
       }
+
+      const openMenu = (e) => {
+        e.preventDefault()
+        setMenu({ x: Math.min(e.clientX, window.innerWidth - 210), y: Math.min(e.clientY, window.innerHeight - 320) })
+      }
+      React.useEffect(() => {
+        if (!menu) return
+        const close = () => setMenu(undefined)
+        window.addEventListener('click', close)
+        window.addEventListener('contextmenu', close)
+        return () => { window.removeEventListener('click', close); window.removeEventListener('contextmenu', close) }
+      }, [menu])
 
       const onDown = (e) => {
         const box = stageRef.current.getBoundingClientRect()
@@ -285,31 +339,44 @@ module.exports = {
         return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up) }
       }, [drag])
 
-      const tools = [
-        ['👥', `组队${size + 1 > 3 ? 1 : size + 1}`, () => setSize((s) => (s % 3) + 1), false],
-        ['🔄', '重掷全队', reroll, false],
-        ['💬', '指点一二', () => {
-          const c = party[speaker.current] || party[0]
-          if (!c) return
-          const q = pickQuote(c)
-          say({ tag: `【${c.name}】指点一二`, text: q ? `“${q}”` : `${c.name}沉吟片刻，暂无一语。` }, 8000)
-        }, false],
-        ['📜', '复制技能', copySkill, false],
-        ['📖', '生平', showBio, false],
-        ['✨', '话术上身', copyIncantation, false],
-        [meditate ? '🌅' : '🧘', meditate ? '出定' : '打坐', toggleBreak, meditate],
-      ]
+      const menuItem = (label, fn, checked) => React.createElement('div', {
+        key: label, className: 'xx-mi',
+        onClick: () => { setMenu(undefined); fn() },
+      },
+        React.createElement('span', { className: 'xx-ck' }, checked ? '✓' : ''),
+        React.createElement('span', null, label))
 
       return React.createElement(React.Fragment, null,
 
-        open && msg && React.createElement('div', { className: 'xx-bubble', style: { opacity: alpha } },
-          React.createElement('span', { className: 'xx-btag' }, msg.tag),
+        // 游戏对话框（纯文字）
+        bubbleOpen && msg && React.createElement('div', { className: 'xx-bubble', style: { opacity: alpha } },
+          React.createElement('div', { className: 'xx-who' }, msg.who),
           React.createElement('div', { className: 'xx-btext' }, msg.text),
-          msg.note && React.createElement('div', { className: 'xx-bnote' }, msg.note),
-          React.createElement('div', { className: 'xx-tools' },
-            tools.map(([icon, title, fn, on]) => React.createElement('button', {
-              key: title, className: 'xx-tbtn' + (on ? ' on' : ''), title, onClick: fn,
-            }, icon))),
+          msg.note && React.createElement('div', { className: 'xx-bnote' }, msg.note)),
+
+        // 右键菜单
+        menu && React.createElement('div', { className: 'xx-menu', style: { left: menu.x, top: menu.y },
+          onClick: (e) => e.stopPropagation() },
+          React.createElement('div', { className: 'xx-mtitle' }, `显示模式（当前：${MODE_LABEL[curMode]}）`),
+          MODES.map((m) => menuItem(`${mode.get() === m ? '✓' : ''} ${MODE_LABEL[m]}`, () => {
+            mode.set(m); setCurMode(m); loadParty(size, m).then((chars) => greet(chars))
+          })),
+          React.createElement('div', { className: 'xx-msep' }),
+          menuItem(`👥 队伍人数 ${size + 1 > 3 ? 1 : size +1}`, () => setSize((s) => (s % 3) + 1)),
+          menuItem('🔄 换一批', reroll),
+          menuItem('💬 指点一二', () => {
+            const c = partyRef.current[speaker.current] || partyRef.current[0]
+            if (!c) return
+            const q = pickQuote(c)
+            say(c.name, q ? `“${q}”` : '沉吟片刻，暂无一语。', undefined, 8000)
+          }),
+          React.createElement('div', { className: 'xx-msep' }),
+          menuItem('📜 复制技能', copySkill),
+          menuItem('📖 生平玉简', showBio),
+          menuItem('✨ 话术上身', copyIncantation),
+          React.createElement('div', { className: 'xx-msep' }),
+          menuItem('🧘 ' + (meditate ? '出定' : '打坐'), toggleBreak),
+          menuItem('📥 收入储物袋', saveToBag),
           React.createElement('div', { className: 'xx-al' },
             '大小',
             React.createElement('input', {
@@ -322,28 +389,30 @@ module.exports = {
             }),
             petSize + 'px'),
           React.createElement('div', { className: 'xx-al' },
-            '透明度',
+            '对话透明度',
             React.createElement('input', {
               type: 'range', min: 35, max: 100, value: Math.round(alpha * 100),
               onInput: (e) => {
-                const v = Math.min(1, Math.max(0.35, Number(e.target.value) / 100 || 0.92))
+                const v = Math.min(1, Math.max(0.35, Number(e.target.value) / 100 || 0.94))
                 setAlpha(v)
                 try { localStorage.setItem('xx-alpha', String(v)) } catch {}
               },
             }))),
 
+        // 宠物舞台
         React.createElement('div', {
           ref: stageRef,
           className: `xx-stage${fx ? ' ' + fx : ''}${meditate ? ' xx-meditate' : ''}`,
           style: Object.assign({ '--xx-pet-size': petSize }, pos ? { right: 'auto', bottom: 'auto', left: pos.x, top: pos.y } : {}),
           onMouseDown: onDown,
+          onContextMenu: openMenu,
         },
           party.map((c, i) => React.createElement('div', {
             key: c.name, className: 'xx-petwrap',
             onClick: () => petClick(i),
-            title: `${c.name}（点我说话）`,
+            title: `${c.name}（左键说话，右键菜单）`,
           },
-            React.createElement('div', { className: 'xx-av', dangerouslySetInnerHTML: { __html: xxAvatarSVG(c, mood).svg } }),
+            React.createElement('div', { className: 'xx-av', dangerouslySetInnerHTML: { __html: xxAvatarSVG(c).svg } }),
             React.createElement('div', { className: 'xx-name' }, c.name + (meditate ? ' · 定' : '')))),
           !party.length && React.createElement('div', { className: 'xx-petwrap', onClick: reroll },
             React.createElement('div', { className: 'xx-av' }),
