@@ -591,7 +591,6 @@ window.__ModuleLoader__.load({
 
           React.useEffect(() => {
             const tick = () => {
-              if (document.visibilityState !== 'visible') return
               api(`/feed?after=${lastId.current}`).then((r) => {
                 for (const ev of r.events || []) {
                   lastId.current = Math.max(lastId.current, ev.id)
@@ -711,7 +710,7 @@ window.__ModuleLoader__.load({
                 React.createElement('input', {
                   type: 'range', min: 35, max: 100, value: Math.round(alpha * 100),
                   onInput: (e) => {
-                    const v = Number(e.target.value) / 100
+                    const v = Math.min(1, Math.max(0.35, Number(e.target.value) / 100 || 0.92))
                     setAlpha(v)
                     try { localStorage.setItem('xx-alpha', String(v)) } catch {}
                   },
@@ -720,7 +719,7 @@ window.__ModuleLoader__.load({
             React.createElement('div', {
               ref: stageRef,
               className: `xx-stage${fx ? ' ' + fx : ''}${meditate ? ' xx-meditate' : ''}`,
-              style: Object.assign({ opacity: alpha, '--xx-pet-size': petSize }, pos ? { right: 'auto', bottom: 'auto', left: pos.x, top: pos.y } : {}),
+              style: Object.assign({ '--xx-pet-size': petSize }, pos ? { right: 'auto', bottom: 'auto', left: pos.x, top: pos.y } : {}),
               onMouseDown: onDown,
             },
               party.map((c, i) => React.createElement('div', {
