@@ -718,24 +718,29 @@ window.__ModuleLoader__.load({
             const c = party[i]
             if (c) {
               speaker.current = i
-              say(c.name, c.identity ? `${c.identity}\n\n` : '' + (pickQuote(c) ? `“${pickQuote(c)}”` : ''),
-                '右键宠物打开法宝菜单', 9000)
+              const q = pickQuote(c)
+              say(c.name, (c.identity ? c.identity + '\n\n' : '') + (q ? `“${q}”` : ''), undefined, 9000)
             }
           }
 
           const openMenu = (e) => {
             e.preventDefault()
+            e.stopPropagation()
             setMenu({ x: Math.min(e.clientX, window.innerWidth - 210), y: Math.min(e.clientY, window.innerHeight - 320) })
           }
           React.useEffect(() => {
             if (!menu) return
             const close = () => setMenu(undefined)
-            window.addEventListener('click', close)
-            window.addEventListener('contextmenu', close)
-            return () => { window.removeEventListener('click', close); window.removeEventListener('contextmenu', close) }
+            // 延迟挂载：跳过打开菜单的那次右键事件，否则菜单刚开即被同事件关闭
+            const t = setTimeout(() => {
+              window.addEventListener('click', close)
+              window.addEventListener('contextmenu', close)
+            }, 0)
+            return () => { clearTimeout(t); window.removeEventListener('click', close); window.removeEventListener('contextmenu', close) }
           }, [menu])
 
           const onDown = (e) => {
+            if (e.button !== 0) return
             const box = stageRef.current.getBoundingClientRect()
             setDrag({ dx: e.clientX - box.left, dy: e.clientY - box.top, moved: false })
           }
