@@ -1,14 +1,14 @@
 'use strict'
 
 /**
- * Q 版形象引擎 v4 —— 像素风（拓麻歌子式）。
- * 每形态一张 16×16 字符画（'.'空 | o描边 b主体 l亮 d暗 h发 s肤 e眼 w高光 p腮红 a金 m嘴）。
- * 眨眼 = 开眼/闭眼双帧切换；配色仍由角色卡数据（名字/身份关键词）驱动。
- * kinds: humanoid(修士/女修/老者/孩童/僧人共用) | beast | bird | insect | ghost | puppet
+ * Q 版形象引擎 v5 —— Minecraft 风格。
+ * 每形态一张方块化像素模板（头/身/臂/腿分件，经典 mob 造型）：
+ *   humanoid = Steve 立正 | beast = 狼(侧) | bird = 鸡 | insect = 蜂 | ghost = 恶魂 | puppet = 铁傀儡
+ * 马赛克噪点纹理 + 同款眨眼双帧。配色仍由角色卡数据关键词驱动。
  */
 
 const KIND_RULES = [
-  ['insect', /虫|蜈蚣|蚁|蛛|蛾|蝶|螳|蝉|蝎/],
+  ['insect', /虫|蜈蚣|蚁|蜂|蛛|蛾|蝶|螳|蝉|蝎/],
   ['bird', /鸟|雕|鹰|鹤|鹏|鸦|隼|鸾|凤|燕|鸥|禽|翼|鹫|鹭/],
   ['beast', /兽|狼|狐|虎|豹|狮|鲸|蛟|龙|蛇|蟒|熊|鹿|鼠|猫|貂|獾|妖狐|灵宠|龟|鳌/],
   ['puppet', /傀儡|儡|人偶|木偶|机关/],
@@ -72,172 +72,201 @@ function xxAnalyze(c) {
   }
 }
 
-/* ── 16×16 字符画模板 ──
-   . 空  o 描边  b 主体  l 亮部  d 暗部  h 发/深  s 肤  e 眼  w 眼高光  p 腮红  a 金  m 嘴 */
+/* ── 模板（字符：. 空 | b 主色 | l 亮 | d 暗 | o 描边深 | h 发 | s 肤 |
+      e 眼白 | p 瞳 | m 嘴 | w 白 | y 金 | r 红 | k 黑 | g 灰 | t 转折暗）── */
 
+// Steve 式立正（20×26）
 const T_HUMANOID = [
-  '......oooo......',
-  '....oohhhhoo....',
-  '...ohhhhhhhho...',
-  '..ohhhhhhhhhho..',
-  '..ohssssssssho..',
-  '..ohswweswwsho..',
-  '..ohseeeeeeesh..',
-  '..ohspsmmsspho..',
-  '..ohssssssssho..',
-  '...oossssssoo...',
-  '..oobbbbbbbboo..',
-  '.osobbaaaaaabos.',
-  '.osobbaaaaaabos.',
-  '..oobbbbbbbboo..',
-  '...oodbbbbdoo...',
-  '...ood....doo...',
+  '....hhhhhhhhhhhh....',
+  '...hhhhhhhhhhhhhh...',
+  '...hhhhhhhhhhhhhh...',
+  '...hhhhhhhhhhhhhh...',
+  '...hssssssssssssh...',
+  '...hseewsssseewsh...',
+  '...hseepsssseepsh...',
+  '...hsssssnssssssh...',
+  '...hssssmmmmssssh...',
+  '....ssssssssssss....',
+  '..bbbbbbbbbbbbbbbo..',
+  '.bbbbbbbbbbbbbbbbbo.',
+  '.bbllbbbbbbbbllbbbo.',
+  '.bbllbbbbbbbbllbbbo.',
+  '.bslbbbbbbbbbblbbso.',
+  '.bslbbbbaabbbblbbso.',
+  '.bslbbbbaabbbblbbso.',
+  '.bslbbbbbbbbbslbboo.',
+  '..sllddddddddlls oo..',
+  '..dddddo..odddddd...',
+  '..dddddo..odddddd...',
+  '..dddddo..odddddd...',
+  '..ooo oo..oo ooo....',
+  '..yyyyo..oyyyyyo....',
+  '..yyyyo..oyyyyyo....',
+  '...ooo....ooooo.....',
 ]
 
+// 狼（侧视 24×18）
 const T_BEAST = [
-  '................',
-  '..oo........oo..',
-  '.ohho.....oohho.',
-  '.ohhho...ohhho..',
-  '..ohhooooohho...',
-  '..ohhhhhhhhhho..',
-  '.ohewhhhhewhho..',
-  '.ohhhhhhhhdmho..',
-  '.ohhhdmmmmmdho..',
-  '..ohhhhhhhhho...',
-  '..oohhhhhhho.oo.',
-  '..ohhbbbbbbhho..',
-  '.ohbbbbbbbbbbho.',
-  '.obbbbbbbbbbbbo.',
-  '.obdoobdoobdoob.',
-  '..oo.oo..oo.oo..',
+  '........................',
+  '..ooo...................',
+  '.ohhho..................',
+  '.ohhho.......oooo.......',
+  '..ohhho....obbbbbbo.....',
+  '..ohewho..obbbbbbbbbo...',
+  '..ohepho..obllbbllbbo...',
+  '..ohhhho.obbbbbbbbbboo..',
+  '..ohhhhooobbbbbbbbbbbo..',
+  '.ohhhhhbbbbbbbbbbbbbo...',
+  '.ohhhhhbbbbbbbbbbbbo....',
+  '.ohhhhhbbbbbbbbbbbo.....',
+  '..ohhhhhbbbbbbbbbo......',
+  '..ohhbbbbbbbbbbbo.......',
+  '..ohbo.ohhbo..ohhbo.....',
+  '..obbo.obbbo..obbbo.....',
+  '..obbo.obbbo..obbbo.....',
+  '..oooo.oooo...oooo......',
 ]
 
+// 鸡（正面 20×20）
 const T_BIRD = [
-  '................',
-  '......oooo......',
-  '.....obbbo......',
-  '....obbbbbo.....',
-  '...obbbbbbo.....',
-  '..ooewbbwbo.....',
-  '..oaabbbbbo.....',
-  '..oaabbbbbo.....',
-  '...obbbbbbo.....',
-  '....obbbbbo.....',
-  '...obbllbbbo....',
-  '..obbllllbbboo..',
-  '.obbbllllbbboo..',
-  '.obbbbbbbbbbo...',
-  '..obbbbbbbbo....',
-  '...oa.oo.ao.....',
+  '.......oooooooo.....',
+  '......obbbbbboo.....',
+  '......obbbbbbo......',
+  '......obkbbbko......',
+  '......obbbbbbo......',
+  '.......oyyyyo.......',
+  '........orryo.......',
+  '....oooooooooooo....',
+  '..oobbbbbbbbbbbboo..',
+  '.obbbbbbbbbbbbbbboo.',
+  '.obbggbbbbbbggbbbo..',
+  '.obbggbbbbbbggbbbo..',
+  '.obbbbbbbbbbbbbbo...',
+  '..obbbbbbbbbbbbo....',
+  '..obbbbbbbbbbbbo....',
+  '...obbbbbbbbbbo.....',
+  '....obbbbbbbbo......',
+  '.....oyo..oyo.......',
+  '.....oyo..oyo.......',
+  '....oyyyooyyyo......',
 ]
 
+// 蜂（侧视 24×14）
 const T_INSECT = [
-  '..oa........oa..',
-  '...oa......oa...',
-  '....oaaaaaao....',
-  '...oobbbbbboo...',
-  '..oobebwwbeboo..',
-  '..oobebwwbeboo..',
-  '..oobbbbbbbboo..',
-  '...oobbbbbboo...',
-  '....oobbbboo....',
-  '.....oobbboo....',
-  '....oobbbbboo...',
-  '..oobbbbbbbbbbo.',
-  '.oobbdbbbbdbbbo.',
-  '.oobbdbbbbdbbbo.',
-  '..oobbbbbbbbboo.',
-  '...oo.oooo.oo...',
+  '......gg......gg........',
+  '.....gggg....gggg.......',
+  '.....gggg....gggg.......',
+  '........................',
+  '...okkkbbbbbbbbbbbbboo..',
+  '..okkkkkbbbbbbbbbbbbboo.',
+  '..okkekkbbbbbbbbbbbbboo.',
+  '..okkekkkkbbbbkkbbbbboo.',
+  '...okkkkkbbbbkkbbbbbbo..',
+  '...okkkkkbbbbkkbbbbbo...',
+  '....ooooobbbbbbbbbo.....',
+  '.........obbbbbbo.......',
+  '..........okkko.........',
+  '...........okko.........',
 ]
 
+// 恶魂（20×22）
 const T_GHOST = [
-  '....oooooooo....',
-  '..oobbbbbbbboo..',
-  '..obbwwbwwbbbo..',
-  '.obbbeebbeebbbo.',
-  '.obbbbbbbbbbbbo.',
-  '.obbbbppppbbbbo.',
-  '.obbbbbaabbbbbo.',
-  '.obbbbbbbbbbbbo.',
-  '.obbbbbbbbbbbbo.',
-  '.obbbbbbbbbbbbo.',
-  '..obbbbbbbbbbo..',
-  '..obbbbbbbbbbo..',
-  '.obbbbbbbbbbbbo.',
-  '.obbobbbbobbbbo.',
-  '.obboobbbboobbo.',
-  '..oo.oooo.oo....',
+  '..oooooooooooooo.....',
+  '.obbbbbbbbbbbbbbo....',
+  '.obbbbbbbbbbbbbbo....',
+  '.obbwwbbbbbbwwbbbo...',
+  '.obbwwbbbbbbwwbbbo...',
+  '.obbbbbbbbbbbbbbbo...',
+  '.obbkkbbbbbbkkbbbo...',
+  '.obbkkbbbbbbkkbbbo...',
+  '.obbbbbbbbbbbbbbbo...',
+  '.obbbbbbbbbbbbbbbbo..',
+  '.obbbbbbbbbbbbbbbbo..',
+  '..obbbbbbbbbbbbbbo...',
+  '..obbbbbbbbbbbbbbo...',
+  '..obbbbbbbbbbbbbbo...',
+  '..oobbbbbbbbbbbboo...',
+  '...obbobbbbbbobbo....',
+  '...obbobbbbbbobbo....',
+  '...obbobbbbbbobbo....',
+  '...obboobbbboobbo....',
+  '...obboobbbboobbo....',
+  '....oo.oooooo.oo.....',
+  '.....................',
 ]
 
+// 铁傀儡式（20×26）
 const T_PUPPET = [
-  '..oooooooooooo..',
-  '..obbbbbbbbbbo..',
-  '..obbwwbbwwbbbo.',
-  '..obeewweeeebbo.',
-  '..obbbbbbbbbbo..',
-  '..obbbaaaabbbbo.',
-  '..oooooooooooo..',
-  '.ooobbbbbbbbooo.',
-  'obbbbbbbbbbbbbbo',
-  'obbbbbbaabbbbbbo',
-  'obbbbbbaabbbbbbo',
-  '.oobbbbbbbbbboo.',
-  '..oodbbbbbbdoo..',
-  '..obbo....obbo..',
-  '..obbo....obbo..',
-  '..oooo....oooo..',
+  '....oooooooooo......',
+  '....obbbbbbbbo......',
+  '....obbbbbbbbo......',
+  '....obbbbbbbbo......',
+  '....obbboobbbo......',
+  '....obbboobbbo......',
+  '....obbbnnbbbbo.....',
+  '....obbbnnbbbbo.....',
+  '....obbbbbbbbo......',
+  '..bbbbbbbbbbbbbb....',
+  '.bbbbbbbbbbbbbbbbo..',
+  '.bbllbbbbbbbbllbbo..',
+  '.bbllbbbbbbbbllbbo..',
+  '.bbllbbbaabbbbllbbo..',
+  '.bbbbbbbaabbbbbbboo..',
+  '.obbbbbbbaabbbbboo...',
+  '..obbbbbbbbbbbboo....',
+  '..obbbbbbbbbbbbo.....',
+  '..obbbbo..obbbbo.....',
+  '..obbbbo..obbbbo.....',
+  '..obbbbo..obbbbo.....',
+  '..obbbbo..obbbbo.....',
+  '.oobbbbo..obbbboo....',
+  '.oyyyyy...oyyyyyo....',
+  '.oyyyyy...oyyyyyo....',
+  '..oooo.....ooooo.....',
 ]
 
 const TEMPLATES = {
-  humanoid: T_HUMANOID,
-  girl: T_HUMANOID,
-  elder: T_HUMANOID,
-  child: T_HUMANOID,
-  monk: T_HUMANOID,
-  cultivator: T_HUMANOID,
-  beast: T_BEAST,
-  bird: T_BIRD,
-  insect: T_INSECT,
-  ghost: T_GHOST,
-  puppet: T_PUPPET,
+  humanoid: T_HUMANOID, girl: T_HUMANOID, elder: T_HUMANOID, child: T_HUMANOID, monk: T_HUMANOID, cultivator: T_HUMANOID,
+  beast: T_BEAST, bird: T_BIRD, insect: T_INSECT, ghost: T_GHOST, puppet: T_PUPPET,
 }
 
-/* 肤色行替换：人形把 'b'（头区）换肤色由模板 's' 已处理；此处仅提供色板 */
 function paletteOf(t) {
   const { hue, sat, light } = t
   return {
-    o: `hsl(${hue},${Math.max(sat - 12, 15)}%,${Math.max(light - 27, 12)}%)`,
     b: `hsl(${hue},${sat}%,${light}%)`,
-    l: `hsl(${hue},${Math.max(sat - 6, 10)}%,${Math.min(light + 24, 93)}%)`,
-    d: `hsl(${hue},${Math.max(sat - 6, 12)}%,${Math.max(light - 15, 14)}%)`,
-    h: `hsl(${hue},${Math.max(sat - 10, 12)}%,${Math.max(light - 8, 18)}%)`,
-    s: '#ffe9d6',
-    e: '#241d18',
-    w: '#ffffff',
-    p: '#ff9d9d',
-    a: '#e8c05a',
-    m: '#6b4a3a',
+    l: `hsl(${hue},${Math.max(sat - 6, 10)}%,${Math.min(light + 16, 90)}%)`,
+    d: `hsl(${hue},${Math.max(sat - 6, 12)}%,${Math.max(light - 14, 15)}%)`,
+    t: `hsl(${hue},${Math.max(sat - 8, 12)}%,${Math.max(light - 9, 16)}%)`,
+    o: `hsl(${hue},${Math.max(sat - 12, 15)}%,${Math.max(light - 27, 12)}%)`,
+    h: `hsl(${hue},${Math.max(sat - 8, 14)}%,${Math.max(light - 10, 16)}%)`,
+    s: '#e8c49a',
+    e: '#ffffff',
+    p: (t.hue > 200 || t.light < 30) ? '#7a4a8a' : '#4a3b8a',
+    m: '#8a5a4a',
+    n: '#c9a02f',
+    w: '#f4f4f4',
+    y: '#e8c05a',
+    r: '#c9564a',
+    k: '#2a2422',
+    g: '#b8c4cc',
   }
 }
 
-/** 字符画 → SVG rects（横向游程合并减少节点）。游离的 w（白）归回主体色。 */
+/** 游程合并 + 马赛克噪点（MC 纹理感）。 */
 function gridToRects(grid, palette) {
-  const at = (x, y) => (grid[y] && grid[y][x]) || '.'
   const rects = []
   for (let y = 0; y < grid.length; y++) {
     const row = grid[y]
     let x = 0
     while (x < row.length) {
-      let ch = row[x]
-      if (ch === '.') { x++; continue }
-      // 白高光只允许紧贴眼黑；游离白点视为主体色
-      if (ch === 'w' && !((at(x - 1, y) === 'e') || (at(x + 1, y) === 'e') || (at(x, y - 1) === 'e') || (at(x, y + 1) === 'e'))) {
-        ch = 'b'
-      }
+      const ch = row[x]
+      if (ch === '.' || ch === ' ') { x++; continue }
       let run = 1
       while (x + run < row.length && row[x + run] === ch) run++
-      const fill = palette[ch] || `hsl(${(ch.charCodeAt(0) * 7) % 360},60%,50%)`
+      let fill = palette[ch]
+      if (!fill) fill = `hsl(${(ch.charCodeAt(0) * 7) % 360},60%,50%)`
+      // MC 纹理噪点：主体/亮部按确定性抖动混入暗像素
+      if ((ch === 'b' || ch === 'l') && (x * 13 + y * 7) % 9 === 0) fill = palette.d || fill
       rects.push(el('rect', { x, y, width: run, height: 1, fill }))
       x += run
     }
@@ -245,47 +274,26 @@ function gridToRects(grid, palette) {
   return rects.join('')
 }
 
-/** 眨眼双帧：把模板中的 e/w 眼区替换为闭眼线。 */
-function closedGrid(grid) {
-  return grid.map((row) => row
-    .replace(/[ew]/g, (ch) => (ch === 'w' ? '.' : 'o')))
-}
-
-function sparkRects(tier) {
-  // 像素十字星光
-  const plus = (x, y, c) => el('rect', { x, y, width: 1, height: 1, fill: c })
-    + el('rect', { x: x - 1, y, width: 1, height: 1, fill: c })
-    + el('rect', { x: x + 1, y, width: 1, height: 1, fill: c })
-    + el('rect', { x, y: y - 1, width: 1, height: 1, fill: c })
-    + el('rect', { x, y: y + 1, width: 1, height: 1, fill: c })
-  const g1 = el('g', { class: 'xx-spark' }, plus(1, 5, '#ffe9a8'))
-  const g2 = el('g', { class: 'xx-spark s2' }, plus(14, 3, '#ffe9a8'))
-  return tier === 1 ? g1 + g2 + plus(13, 13, '#ffd97a') : g1 + g2
-}
-
 function el(tag, attrs, inner) {
   const a = Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ')
   return `<${tag} ${a}>${inner || ''}</${tag}>`
+}
+
+/** 眨眼：把眼睛两行换成闭合线（肤色/暗色）。 */
+function closedGrid(grid) {
+  return grid.map((row) => row.replace(/[ep]/g, 's').replace(/[ew]w/g, 'ss'))
 }
 
 function xxAvatarSVG(c) {
   const t = xxAnalyze(c)
   const palette = paletteOf(t)
   const grid = TEMPLATES[t.kind] || T_HUMANOID
-  const open = gridToRects(grid, palette)
-  const closed = gridToRects(closedGrid(grid), palette)
-  const eyesOpen = grid.flatMap((row, y) => [...row].map((ch, x) => ({ ch, x, y })))
-    .filter((p) => p.ch === 'e' || p.ch === 'w')
-  void eyesOpen
-  // 眨眼组：开眼帧（整帧）与闭眼帧（整帧）交替；此处简化为整帧替换
-  const frameOpen = el('g', { class: 'xx-eo' }, open)
-  const frameClosed = el('g', { class: 'xx-ec' }, gridToRects(closedGrid(grid), palette))
-  void closed
-  const inner = frameOpen + frameClosed + sparkRects(t.tier === 1 ? 1 : 0)
+  const open = el('g', { class: 'xx-eo' }, gridToRects(grid, palette))
+  const closed = el('g', { class: 'xx-ec' }, gridToRects(closedGrid(grid), palette))
   const svg = el('svg', {
-    class: 'xx-svg', viewBox: '0 0 16 16', width: '100%', height: '100%',
+    class: 'xx-svg', viewBox: `0 0 ${grid[0].length} ${grid.length}`, width: '100%', height: '100%',
     'shape-rendering': 'crispEdges', xmlns: 'http://www.w3.org/2000/svg',
-  }, inner)
+  }, open + closed)
   return { svg, traits: t }
 }
 
