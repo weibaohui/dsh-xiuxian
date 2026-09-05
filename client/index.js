@@ -19,11 +19,11 @@ const STYLE = `
 @keyframes xx-zzz{0%{transform:translateY(0);opacity:0}30%{opacity:.9}100%{transform:translateY(-12px) translateX(5px);opacity:0}}
 .xx-stage{position:fixed;right:26px;bottom:18px;z-index:1200;display:flex;gap:4px;align-items:flex-end;
   font:13px/1.6 "PingFang SC","Microsoft YaHei",sans-serif;user-select:none}
-.xx-petwrap{width:132px;text-align:center;cursor:grab;animation:xx-float 3.4s ease-in-out infinite}
+.xx-petwrap{width:calc(var(--xx-pet-size) * 1px);text-align:center;cursor:grab;animation:xx-float 3.4s ease-in-out infinite}
 .xx-petwrap:active{cursor:grabbing}
 .xx-petwrap:nth-child(2){animation-delay:.4s}
 .xx-petwrap:nth-child(3){animation-delay:.8s}
-.xx-av{width:130px;height:138px}
+.xx-av{width:calc(var(--xx-pet-size) * 1px - 2px);height:calc(var(--xx-pet-size) * 1px + 6px)}
 .xx-name{color:#d4b06a;font-size:12px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .xx-stage.xx-hop .xx-av{animation:xx-hop .6s ease}
 .xx-stage.xx-cast .xx-av{filter:drop-shadow(0 0 10px #ffd97a) brightness(1.2)}
@@ -109,6 +109,10 @@ module.exports = {
       const [alpha, setAlpha] = React.useState(() => {
         const v = parseFloat(localStorage.getItem('xx-alpha'))
         return Number.isFinite(v) ? Math.min(1, Math.max(0.35, v)) : 0.92
+      })
+      const [petSize, setPetSize] = React.useState(() => {
+        const v = Number(localStorage.getItem('xx-pet-size'))
+        return Number.isFinite(v) ? Math.min(200, Math.max(64, v)) : 132
       })
       const [fx, setFx] = React.useState('')
       const [mood, setMood] = React.useState('idle')   // idle | working | failed | sleep
@@ -308,6 +312,17 @@ module.exports = {
               key: title, className: 'xx-tbtn' + (on ? ' on' : ''), title, onClick: fn,
             }, icon))),
           React.createElement('div', { className: 'xx-al' },
+            '大小',
+            React.createElement('input', {
+              type: 'range', min: 64, max: 200, value: petSize,
+              onInput: (e) => {
+                const v = Number(e.target.value)
+                setPetSize(v)
+                try { localStorage.setItem('xx-pet-size', String(v)) } catch {}
+              },
+            }),
+            petSize + 'px'),
+          React.createElement('div', { className: 'xx-al' },
             '透明度',
             React.createElement('input', {
               type: 'range', min: 35, max: 100, value: Math.round(alpha * 100),
@@ -321,7 +336,7 @@ module.exports = {
         React.createElement('div', {
           ref: stageRef,
           className: `xx-stage${fx ? ' ' + fx : ''}${meditate ? ' xx-meditate' : ''}`,
-          style: Object.assign({ opacity: alpha }, pos ? { right: 'auto', bottom: 'auto', left: pos.x, top: pos.y } : {}),
+          style: Object.assign({ opacity: alpha, '--xx-pet-size': petSize }, pos ? { right: 'auto', bottom: 'auto', left: pos.x, top: pos.y } : {}),
           onMouseDown: onDown,
         },
           party.map((c, i) => React.createElement('div', {
