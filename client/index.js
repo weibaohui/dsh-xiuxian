@@ -25,6 +25,14 @@ const STYLE = `
 @keyframes xx-svgaura{0%,100%{opacity:.5}50%{opacity:.85}}
 @keyframes xx-aura{0%,100%{opacity:.45;transform:translate(-50%,-50%) scale(1)}50%{opacity:.8;transform:translate(-50%,-50%) scale(1.08)}}
 .xx-eyes{transform-box:fill-box;transform-origin:center;animation:xx-blink 4.4s ease-in-out infinite}
+@keyframes xx-eoblink{0%,88%,100%{opacity:1}92%,96%{opacity:0}}
+@keyframes xx-ecblink{0%,88%,100%{opacity:0}92%,96%{opacity:1}}
+.xx-ec{opacity:0}
+.xx-pet:not(.xx-meditate) .xx-eo{animation:xx-eoblink 4.4s ease-in-out infinite}
+.xx-pet:not(.xx-meditate) .xx-ec{animation:xx-ecblink 4.4s ease-in-out infinite}
+.xx-meditate .xx-eo{opacity:0}
+.xx-meditate .xx-ec{opacity:1}
+.xx-svg{image-rendering:pixelated}
 .xx-bodyG{transform-box:fill-box;transform-origin:50% 92%;animation:xx-breathe 2.6s ease-in-out infinite}
 .xx-tail{transform-box:fill-box;transform-origin:15% 85%;animation:xx-wag 2.1s ease-in-out infinite}
 .xx-spark{transform-box:fill-box;transform-origin:center;animation:xx-twinkle 1.8s ease-in-out infinite}
